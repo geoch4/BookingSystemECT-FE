@@ -1,9 +1,8 @@
 import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import TopNav from '../components/common/TopNav';
+import { CalendarDays } from 'lucide-react';
 import TessaBar from '../components/common/TessaBar';
-import AcuteModuleBanner from '../components/dashboard/AcuteModuleBanner';
 import ModuleCard from '../components/dashboard/ModuleCard';
 import QuickActions from '../components/dashboard/QuickActions';
 import { useAuth } from '../context/useAuth';
@@ -11,67 +10,36 @@ import type { ModuleTone, ModuleCardData } from '../utils/mockData';
 import { landingMock } from '../utils/mockData';
 import { getBookings } from '../api/bookings';
 import { isEctType, isRtmsType } from '../types';
+import BackendErrorState from '../components/common/BackendErrorState';
 
-// Formaterar dagens datum på svenska för toppnavigationen.
 function todayLabel() {
   return new Intl.DateTimeFormat('sv-SE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   }).format(new Date());
 }
 
-// Samlade inline-styles för sidan.
-// Det gör komponenten lättare att läsa än om varje style låg direkt i JSX:en.
 const styles: Record<string, CSSProperties> = {
-  // Hela sidans bakgrund och avstånd under den fasta toppbaren.
   page: {
-    minHeight: '100vh',
-    background: 'var(--page-bg)',
-    color: 'var(--text-main)',
-    paddingTop: 72,
+    width: '100%', maxWidth: 1200, margin: '0 auto', padding: '32px 28px 64px',
   },
-  // Huvudinnehållet centreras och får en maxbredd så det blir lättläst.
-  main: {
-    width: '100%',
-    maxWidth: 1180,
-    margin: '0 auto',
-    padding: '24px',
+  headRow: {
+    display: 'flex', alignItems: 'center', gap: 20, marginBottom: 20,
   },
-  // Rubrikblocket ovanför modulkorten.
-  heading: {
-    marginBottom: 16,
+  title: { margin: 0, fontSize: 26, fontWeight: 750, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text-main)' },
+  date: {
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    color: 'var(--text-muted)', fontSize: 13.5, fontWeight: 600,
   },
-  // Liten sektionsetikett, till exempel "Välj modul".
-  sectionLabel: {
-    color: 'var(--text-subtle)',
-    fontSize: 'var(--type-label)',
-    fontWeight: 700,
-    letterSpacing: 0,
-    textTransform: 'uppercase',
-    marginBottom: 8,
+  grid: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 20, marginTop: 20,
   },
-  // Huvudrubriken på startsidan.
-  title: {
-    margin: 0,
-    color: 'var(--text-main)',
-    fontSize: 'var(--type-display)',
-    fontWeight: 750,
-    lineHeight: 1.15,
-  },
-  // Brödtext under rubriken.
-  body: {
-    margin: '8px 0 0',
-    color: 'var(--text-muted)',
-    fontSize: 15,
-    lineHeight: 1.55,
-  },
-  // Responsivt rutnät: två kort på stor skärm, ett kort på mindre skärm.
-  moduleGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: 24,
+  quietActions: {
+    marginTop: 28,
+    padding: '18px 20px 1px',
+    border: '1px solid #B8C8D8',
+    borderRadius: 12,
+    background: '#DCE6F0',
+    boxShadow: '0 5px 14px rgba(23, 32, 51, 0.08)',
   },
 };
 
@@ -88,10 +56,8 @@ function getRoleView(role?: string): RoleView {
   const normalizedRole = role?.trim().toLowerCase() ?? '';
 
   if (
-    normalizedRole.includes('överläk')
-    || normalizedRole.includes('overlak')
-    || normalizedRole === 'öl'
-    || normalizedRole.includes('doctor')
+    normalizedRole.includes('överläk') || normalizedRole.includes('overlak')
+    || normalizedRole === 'öl' || normalizedRole.includes('doctor')
   ) {
     return {
       roleLabel: 'Överläkare',
@@ -99,7 +65,7 @@ function getRoleView(role?: string): RoleView {
       title: 'Remisser att bedöma',
       description: 'Granska prioriteringar, akuta ECT-ärenden och medicinska underlag.',
       actionNames: ['Prioriteringslista', 'Styrdokument'],
-      moduleIds: ['acuteEct', 'ect'],
+      moduleIds: ['ect', 'rtms'],
     };
   }
 
@@ -110,7 +76,7 @@ function getRoleView(role?: string): RoleView {
       title: 'Behandlingsberedskap',
       description: 'Se dagens ECT-flöde, akuta patienter och relevanta styrdokument.',
       actionNames: ['Styrdokument'],
-      moduleIds: ['ect', 'acuteEct'],
+      moduleIds: ['ect'],
     };
   }
 
@@ -118,9 +84,9 @@ function getRoleView(role?: string): RoleView {
     roleLabel: 'ECT-koordinator',
     actionLabel: 'Koordinatorverktyg',
     title: 'Dagens behandlingsflöde',
-    description: 'Hantera remisser, prioriteringar och tillgängliga behandlingsplatser.',
+    description: 'Oversikt över beläggning och bemanning. Välj en modul för att arbeta vidare.',
     actionNames: ['Ny remiss', 'Prioriteringslista', 'Styrdokument', 'Statistik & Kvalitet'],
-    moduleIds: ['ect', 'rtms', 'acuteEct'],
+    moduleIds: ['ect', 'rtms'],
   };
 }
 
@@ -128,119 +94,106 @@ const ECT_CAPACITY = 12;
 const RTMS_CAPACITY = 13;
 
 function buildLiveModules(
-  bookings: { date: string; status: string; priority: string; treatmentType: number }[],
+  bookings: { date: string; status: string; priority: string; treatmentTypeId: number }[],
 ): ModuleCardData[] {
   const today = new Date().toISOString().slice(0, 10);
   const todayActive = bookings.filter((b) => b.date.slice(0, 10) === today && b.status !== 'Cancelled');
 
-  const ect = todayActive.filter((b) => isEctType(b.treatmentType));
-  const rtms = todayActive.filter((b) => isRtmsType(b.treatmentType));
+  const ect  = todayActive.filter((b) => isEctType(b.treatmentTypeId));
+  const rtms = todayActive.filter((b) => isRtmsType(b.treatmentTypeId));
 
   function stats(list: typeof ect) {
     const akut = list.filter((b) => b.priority === 'Red').length;
-    const ok = list.filter((b) => b.status === 'Confirmed' && b.priority !== 'Red').length;
-    const warn = list.length - akut - ok;
-    return { booked: list.length, akut, ok, warn: Math.max(warn, 0) };
+    const ok   = list.filter((b) => b.status === 'Confirmed' && b.priority !== 'Red').length;
+    const warn = Math.max(list.length - akut - ok, 0);
+    return { booked: list.length, akut, ok, warn };
   }
 
   const es = stats(ect);
   const rs = stats(rtms);
 
-  return landingMock.modules.map((m) => {
-    if (m.id === 'ect') {
-      return {
-        ...m,
-        capacityLabel: `${es.booked} bokade av ${ECT_CAPACITY} platser`,
-        statusTone: es.akut > 0 ? 'akut' : es.warn > 0 ? 'warn' : 'ok',
-        statusRows: [
-          { ...m.statusRows[0], count: es.ok },
-          { ...m.statusRows[1], count: es.warn },
-          { ...m.statusRows[2], count: es.akut },
-        ],
-      };
-    }
-    if (m.id === 'rtms') {
-      return {
-        ...m,
-        capacityLabel: `${rs.booked} bokade av ${RTMS_CAPACITY} platser`,
-        statusTone: rs.akut > 0 ? 'akut' : rs.warn > 0 ? 'warn' : 'ok',
-        statusRows: [
-          { ...m.statusRows[0], count: rs.ok },
-          { ...m.statusRows[1], count: rs.warn },
-          { ...m.statusRows[2], count: rs.akut },
-        ],
-      };
-    }
-    return m;
-  });
+  return landingMock.modules
+    .filter((m) => m.id !== 'acuteEct')
+    .map((m) => {
+      if (m.id === 'ect') {
+        return {
+          ...m,
+          capacityLabel: `${es.booked} bokade av ${ECT_CAPACITY} platser`,
+          statusTone: es.akut > 0 ? 'akut' : es.warn > 0 ? 'warn' : 'ok',
+          statusRows: [
+            { ...m.statusRows[0], count: es.ok },
+            { ...m.statusRows[1], count: es.warn },
+            { ...m.statusRows[2], count: es.akut },
+          ],
+        } as ModuleCardData;
+      }
+      if (m.id === 'rtms') {
+        return {
+          ...m,
+          capacityLabel: `${rs.booked} bokade av ${RTMS_CAPACITY} platser`,
+          statusTone: rs.akut > 0 ? 'akut' : rs.warn > 0 ? 'warn' : 'ok',
+          statusRows: [
+            { ...m.statusRows[0], count: rs.ok },
+            { ...m.statusRows[1], count: rs.warn },
+            { ...m.statusRows[2], count: rs.akut },
+          ],
+        } as ModuleCardData;
+      }
+      return m;
+    });
 }
 
 export default function LandingPage() {
-  // useNavigate används för att byta sida när användaren klickar på kort/knappar.
   const navigate = useNavigate();
   const { user } = useAuth();
   const roleView = getRoleView(user?.role);
 
-  const { data: bookings = [] } = useQuery({ queryKey: ['bookings'], queryFn: getBookings });
-
+  const bookingsQuery = useQuery({ queryKey: ['bookings'], queryFn: getBookings });
+  const bookings = bookingsQuery.data ?? [];
   const liveModules = buildLiveModules(bookings);
 
-  const visibleActions = landingMock.quickActions.filter((action) => roleView.actionNames.includes(action.label));
-  const visibleModules = liveModules.filter((module) => roleView.moduleIds.includes(module.id));
-  const acuteModule = visibleModules.find((module) => module.id === 'acuteEct');
-  const regularModules = visibleModules.filter((module) => module.id !== 'acuteEct');
+  const visibleActions = landingMock.quickActions.filter((a) => roleView.actionNames.includes(a.label));
+  const visibleModules = liveModules.filter((m) => roleView.moduleIds.includes(m.id));
 
   return (
-    <div style={styles.page}>
-      {/* Fast toppnavigation med systemnamn, roll, datum och remissnotiser. */}
-      <TopNav
-        systemName="ECT & rTMS · Sahlgrenska"
-        role={roleView.roleLabel}
-        dateLabel={todayLabel()}
-        unreadCount={landingMock.tessa.unreadRemisser}
-        notifications={landingMock.notifications}
-        onNotificationOpen={(route) => navigate(route)}
-      />
+    <main style={styles.page}>
+      <div style={styles.headRow}>
+        <h1 style={styles.title}>{roleView.title}</h1>
+        <div style={styles.date}>
+          <CalendarDays size={15} color="var(--ect-color)" aria-hidden="true" />
+          {todayLabel()}
+        </div>
+      </div>
 
-      <main style={styles.main}>
-        {/* TESSA-status visas först eftersom bemanning påverkar dagens behandlingsflöde. */}
-        <TessaBar data={landingMock.tessa} />
+      <TessaBar data={landingMock.tessa} />
 
-        {acuteModule && <AcuteModuleBanner module={acuteModule} onOpen={(route) => navigate(route)} />}
-
-        {/* De vanligaste arbetsflödena ska nås direkt utan att användaren behöver scrolla. */}
-        <QuickActions
-          actions={visibleActions}
-          label={roleView.actionLabel}
-          onNavigate={(route) => navigate(route)}
+      {bookingsQuery.isError && (
+        <BackendErrorState
+          error={bookingsQuery.error}
+          onRetry={() => void bookingsQuery.refetch()}
         />
+      )}
 
-        {/* Modulvalet är startsidans viktigaste del: ECT eller rTMS. */}
-        <section aria-labelledby="module-heading">
-          <div style={styles.heading}>
-            <div style={styles.sectionLabel}>Din arbetsvy</div>
-            <h1 id="module-heading" style={styles.title}>
-              {roleView.title}
-            </h1>
-            <p style={styles.body}>{roleView.description}</p>
-          </div>
+      {!bookingsQuery.isError && <div style={styles.grid}>
+        {visibleModules.map((module) => (
+          <ModuleCard
+            key={module.id}
+            module={module}
+            onOpen={(route) => navigate(route)}
+            onStatusOpen={(route) => navigate(route)}
+          />
+        ))}
+      </div>}
 
-          <div style={styles.moduleGrid}>
-            {/* Varje modul i mockData blir ett klickbart ModuleCard. */}
-            {regularModules.map((module) => (
-              <ModuleCard
-                key={module.id}
-                module={module}
-                // Klick på hela kortet går till modulens huvudvy.
-                onOpen={(route) => navigate(route)}
-                // Klick på en statusrad går direkt till filtrerad vy.
-                onStatusOpen={(route) => navigate(route)}
-              />
-            ))}
-          </div>
-        </section>
-
-      </main>
-    </div>
+      {visibleActions.length > 0 && (
+        <div style={styles.quietActions}>
+          <QuickActions
+            actions={visibleActions}
+            label={roleView.actionLabel}
+            onNavigate={(route) => navigate(route)}
+          />
+        </div>
+      )}
+    </main>
   );
 }

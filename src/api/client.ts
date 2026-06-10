@@ -33,6 +33,10 @@ client.interceptors.response.use(
 
   // Om backend returnerar fel hanteras det här.
   (err) => {
+    if (err.response) {
+      console.error('[API ERROR]', err.config?.method?.toUpperCase(), err.config?.url, err.response.status);
+      console.error('[API ERROR body]', JSON.stringify(err.response.data, null, 2));
+    }
     // 401 betyder att användaren inte längre är behörig/inloggad.
     if (err.response?.status === 401) {
       // Ta bort token eftersom den inte längre fungerar.

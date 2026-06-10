@@ -5,6 +5,10 @@ import { getRoles, createRole, updateRole, deleteRole } from '../api/roles';
 import { register } from '../api/auth';
 import type { UserDto, RoleDto, CreateUserDto } from '../types';
 import { TREATMENT_TYPE_LABELS } from '../types';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import BackendErrorState from '../components/common/BackendErrorState';
+import Spinner from '../components/common/Spinner';
+import EmptyState from '../components/common/EmptyState';
 
 type Tab = 'treatments' | 'users' | 'roles';
 
@@ -16,7 +20,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-[#1A2332]">{title}</h2>
-          <button onClick={onClose} className="text-[#8494AA] hover:text-[#1A2332] text-xl leading-none">✕</button>
+          <button onClick={onClose} aria-label="Stäng dialog" className="text-[#8494AA] hover:text-[#1A2332] text-xl leading-none">✕</button>
         </div>
         {children}
       </div>
@@ -78,7 +82,7 @@ function TreatmentsTab() {
       <div className="bg-white rounded-xl border border-[#DDE3EC]">
         <table className="w-full">
           <thead><tr className="text-left text-xs font-medium text-[#8494AA] uppercase tracking-wider border-b border-[#DDE3EC]">
-            <th className="px-4 py-3">ID</th><th className="px-4 py-3">Namn</th><th className="px-4 py-3">Modul</th>
+            <th scope="col" className="px-4 py-3">ID</th><th scope="col" className="px-4 py-3">Namn</th><th scope="col" className="px-4 py-3">Modul</th>
           </tr></thead>
           <tbody>
             {entries.map(([v, label]) => (
@@ -156,7 +160,8 @@ function UserModal({ onClose }: { onClose: () => void }) {
 function UsersTab() {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
-  const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: getUsers });
+  const [confirmDialog, setConfirmDialog] = useState<{ userId: number; name: string } | null>(null);
+  const { data: users = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['users'], queryFn: getUsers });
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
@@ -164,13 +169,18 @@ function UsersTab() {
 
   return (
     <div>
-      <SectionHeader title="Användare" count={users.length} onAdd={() => setShowModal(true)} />
+      <SectionHeader title="Användare" count={isError ? 0 : users.length} onAdd={() => setShowModal(true)} />
+      {isError && (
+        <div className="mb-4">
+          <BackendErrorState error={error} onRetry={() => void refetch()} />
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-[#DDE3EC]">
-        {isLoading ? <LoadingRow /> : users.length === 0 ? <EmptyRow text="Inga användare registrerade." /> : (
+        {isLoading ? <LoadingRow /> : isError ? null : users.length === 0 ? <EmptyRow text="Inga användare registrerade." /> : (
           <table className="w-full">
             <thead><tr className="text-left text-xs font-medium text-[#8494AA] uppercase tracking-wider border-b border-[#DDE3EC]">
-              <th className="px-4 py-3">ID</th><th className="px-4 py-3">Namn</th>
-              <th className="px-4 py-3">E-post</th><th className="px-4 py-3">Roll</th><th className="px-4 py-3"></th>
+              <th scope="col" className="px-4 py-3">ID</th><th scope="col" className="px-4 py-3">Namn</th>
+              <th scope="col" className="px-4 py-3">E-post</th><th scope="col" className="px-4 py-3">Roll</th><th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
             </tr></thead>
             <tbody>
               {users.map((u: UserDto) => (
@@ -184,7 +194,7 @@ function UsersTab() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => { if (confirm(`Radera ${u.fullname}?`)) deleteMutation.mutate(u.userId); }}
+                    <button onClick={() => setConfirmDialog({ userId: u.userId, name: u.fullname })}
                       className="text-xs text-[#C42B2B] hover:underline">Radera</button>
                   </td>
                 </tr>
@@ -194,6 +204,15 @@ function UsersTab() {
         )}
       </div>
       {showModal && <UserModal onClose={() => setShowModal(false)} />}
+      {confirmDialog && (
+        <ConfirmDialog
+          title="Radera användare"
+          message={`${confirmDialog.name} tas bort permanent.`}
+          confirmLabel="Radera"
+          onConfirm={() => { deleteMutation.mutate(confirmDialog.userId); setConfirmDialog(null); }}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -239,7 +258,8 @@ function RoleModal({ existing, onClose }: { existing?: RoleDto; onClose: () => v
 function RolesTab() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; item?: RoleDto }>({ open: false });
-  const { data: roles = [], isLoading } = useQuery({ queryKey: ['roles'], queryFn: getRoles });
+  const [confirmDialog, setConfirmDialog] = useState<{ roleId: number; name: string } | null>(null);
+  const { data: roles = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['roles'], queryFn: getRoles });
   const deleteMutation = useMutation({
     mutationFn: deleteRole,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
@@ -247,12 +267,17 @@ function RolesTab() {
 
   return (
     <div>
-      <SectionHeader title="Roller" count={roles.length} onAdd={() => setModal({ open: true })} />
+      <SectionHeader title="Roller" count={isError ? 0 : roles.length} onAdd={() => setModal({ open: true })} />
+      {isError && (
+        <div className="mb-4">
+          <BackendErrorState error={error} onRetry={() => void refetch()} />
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-[#DDE3EC]">
-        {isLoading ? <LoadingRow /> : roles.length === 0 ? <EmptyRow text="Inga roller registrerade." /> : (
+        {isLoading ? <LoadingRow /> : isError ? null : roles.length === 0 ? <EmptyRow text="Inga roller registrerade." /> : (
           <table className="w-full">
             <thead><tr className="text-left text-xs font-medium text-[#8494AA] uppercase tracking-wider border-b border-[#DDE3EC]">
-              <th className="px-4 py-3">ID</th><th className="px-4 py-3">Namn</th><th className="px-4 py-3"></th>
+              <th scope="col" className="px-4 py-3">ID</th><th scope="col" className="px-4 py-3">Namn</th><th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
             </tr></thead>
             <tbody>
               {roles.map((r) => (
@@ -262,7 +287,7 @@ function RolesTab() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <button onClick={() => setModal({ open: true, item: r })} className="text-xs text-[#1A4F8A] hover:underline">Redigera</button>
-                      <button onClick={() => { if (confirm(`Radera rollen "${r.roleName}"?`)) deleteMutation.mutate(r.roleId); }}
+                      <button onClick={() => setConfirmDialog({ roleId: r.roleId, name: r.roleName })}
                         className="text-xs text-[#C42B2B] hover:underline">Radera</button>
                     </div>
                   </td>
@@ -273,6 +298,15 @@ function RolesTab() {
         )}
       </div>
       {modal.open && <RoleModal existing={modal.item} onClose={() => setModal({ open: false })} />}
+      {confirmDialog && (
+        <ConfirmDialog
+          title="Radera roll"
+          message={`Rollen "${confirmDialog.name}" tas bort permanent.`}
+          confirmLabel="Radera"
+          onConfirm={() => { deleteMutation.mutate(confirmDialog.roleId); setConfirmDialog(null); }}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -280,10 +314,14 @@ function RolesTab() {
 // ─── Tiny shared table helpers ────────────────────────────────────────────────
 
 function LoadingRow() {
-  return <div className="p-8 text-center text-sm text-[#8494AA]">Laddar...</div>;
+  return (
+    <div className="flex items-center justify-center gap-3 p-8 text-sm text-[#8494AA]">
+      <Spinner size={18} /> Laddar...
+    </div>
+  );
 }
 function EmptyRow({ text }: { text: string }) {
-  return <div className="p-8 text-center text-sm text-[#8494AA]">{text}</div>;
+  return <EmptyState title={text} />;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

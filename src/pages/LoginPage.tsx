@@ -4,11 +4,14 @@ import { useAuth } from '../context/useAuth';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
 import { getRoles } from '../api/roles';
 import { useQuery } from '@tanstack/react-query';
+import LanguageSwitch from '../components/common/LanguageSwitch';
+import { useLanguage } from '../context/LanguageContext';
 
 type Mode = 'login' | 'register';
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('login');
 
@@ -92,7 +95,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8]">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#F0F4F8]">
+      <div className="absolute right-5 top-5">
+        <LanguageSwitch />
+      </div>
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
         {/* Header */}
         <div className="mb-6 text-center">
@@ -100,9 +106,9 @@ export default function LoginPage() {
             ECT
           </div>
           <h1 className="text-2xl font-semibold text-[#1A2332]">
-            {mode === 'login' ? 'Logga in' : 'Skapa konto'}
+            {mode === 'login' ? t('signIn') : t('createAccount')}
           </h1>
-          <p className="text-sm text-[#8494AA] mt-1">ECT/rTMS Bokningssystem</p>
+          <p className="text-sm text-[#8494AA] mt-1">{t('bookingSystem')}</p>
         </div>
 
         {/* Mode toggle */}
@@ -117,7 +123,7 @@ export default function LoginPage() {
                   : 'text-[#8494AA] hover:text-[#4B5770]'
               }`}
             >
-              {m === 'login' ? 'Logga in' : 'Registrera'}
+              {m === 'login' ? t('signIn') : t('register')}
             </button>
           ))}
         </div>
@@ -125,7 +131,7 @@ export default function LoginPage() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">E-post</label>
+              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('email')}</label>
               <input
                 type="email"
                 required
@@ -136,7 +142,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">Lösenord</label>
+              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('password')}</label>
               <input
                 type="password"
                 required
@@ -152,13 +158,13 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-[#1A4F8A] hover:bg-[#1a3f6f] text-white font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-60"
             >
-              {loading ? 'Loggar in...' : 'Logga in'}
+              {loading ? t('signingIn') : t('signIn')}
             </button>
           </form>
         ) : (
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">Fullständigt namn</label>
+              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('fullName')}</label>
               <input
                 type="text"
                 required
@@ -169,7 +175,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">E-post</label>
+              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('email')}</label>
               <input
                 type="email"
                 required
@@ -180,7 +186,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">Lösenord</label>
+              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('password')}</label>
               <input
                 type="password"
                 required
@@ -192,14 +198,14 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">Roll</label>
+              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('role')}</label>
               <select
                 required
                 value={regRoleId || ''}
                 onChange={(e) => setRegRoleId(Number(e.target.value))}
                 className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]"
               >
-                <option value="">Välj roll...</option>
+                <option value="">{t('chooseRole')}</option>
                 {roles.map((r) => (
                   <option key={r.roleId} value={r.roleId}>{r.roleName}</option>
                 ))}
@@ -211,7 +217,7 @@ export default function LoginPage() {
               disabled={loading || !regRoleId}
               className="w-full bg-[#1A4F8A] hover:bg-[#1a3f6f] text-white font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-60"
             >
-              {loading ? 'Skapar konto...' : 'Skapa konto'}
+              {loading ? t('creatingAccount') : t('createAccount')}
             </button>
             <p className="text-xs text-center text-[#8494AA]">
               Kräver admin-behörighet. Kontakta systemadmin om du inte kan registrera dig.

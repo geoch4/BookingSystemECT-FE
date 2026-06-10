@@ -33,7 +33,7 @@ export interface BookingDto {
   bookingId: number;
   date: string;
   patientId: number;
-  treatmentType: TreatmentType;
+  treatmentTypeId: TreatmentType;
   createdById: number;
   createdAt: string;
   priority: BookingPriority;
@@ -47,7 +47,7 @@ export interface BookingDto {
 export interface CreateBookingDto {
   date: string;
   patientId: number;
-  treatmentType: TreatmentType;
+  treatmentTypeId: TreatmentType;
   createdById: number;
   createdAt: string;
   priority: BookingPriority;

@@ -12,6 +12,7 @@ import DocumentsPage from './pages/DocumentsPage';
 import ReferralPage from './pages/ReferralPage';
 import AdminPage from './pages/AdminPage';
 import StatisticsPage from './pages/StatisticsPage';
+import { LanguageProvider } from './context/LanguageContext';
 
 // React Query-klienten styr hur API-data hämtas och cachas i hela appen.
 const queryClient = new QueryClient({
@@ -24,8 +25,9 @@ const queryClient = new QueryClient({
 
 export default function App() {
   return (
-    // QueryClientProvider gör React Query tillgängligt för alla sidor.
-    <QueryClientProvider client={queryClient}>
+    <LanguageProvider>
+      {/* QueryClientProvider gör React Query tillgängligt för alla sidor. */}
+      <QueryClientProvider client={queryClient}>
       {/* AuthProvider håller koll på inloggad användare och roller. */}
       <AuthProvider>
         {/* BrowserRouter aktiverar URL-baserad navigation i React. */}
@@ -35,11 +37,10 @@ export default function App() {
             {/* Login ligger utanför layouten eftersom den inte ska visa sidomenyn. */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Startsidan är första sidan användaren ser. */}
-            <Route path="/" element={<LandingPage />} />
-
             {/* Alla routes inuti AppLayout får gemensam layout och sidomeny. */}
             <Route element={<AppLayout />}>
+              {/* Startsidan är första sidan användaren ser. */}
+              <Route path="/" element={<LandingPage />} />
               {/* Dashboard kan visa alla block eller filtreras via querystring. */}
               <Route path="/dashboard" element={<DashboardPage />} />
 
@@ -69,6 +70,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </LanguageProvider>
   );
 }

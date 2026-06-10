@@ -8,9 +8,14 @@ export default function AppLayout() {
   if (!token || !user) return <Navigate to="/login" replace />;
 
   return (
-    <div className="flex min-h-screen bg-[#F0F4F8]">
+    <div className="min-h-screen" style={{ background: 'var(--page-bg)' }}>
+      <a href="#main-content" className="skip-link">Hoppa till innehåll</a>
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main
+        id="main-content"
+        className="min-w-0 overflow-x-hidden"
+        style={{ marginLeft: 220, minHeight: '100dvh' }}
+      >
         <Outlet />
       </main>
     </div>

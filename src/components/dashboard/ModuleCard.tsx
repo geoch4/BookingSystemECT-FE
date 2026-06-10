@@ -1,7 +1,7 @@
+import { useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
-import { Activity, AlertTriangle, ArrowRight, Brain, Siren } from 'lucide-react';
-import StatusBadge from './StatusBadge';
-import type { ModuleCardData, ModuleTone, StatusTone } from '../../utils/mockData';
+import { Activity, ArrowRight, Brain, Check, Plus } from 'lucide-react';
+import type { ModuleCardData, ModuleTone } from '../../utils/mockData';
 
 export interface ModuleCardProps {
   module: ModuleCardData;
@@ -9,372 +9,280 @@ export interface ModuleCardProps {
   onStatusOpen: (route: string) => void;
 }
 
-const moduleVisuals: Record<ModuleTone, { color: string; bg: string; soft: string; icon: ReactNode }> = {
+const moduleVisuals: Record<ModuleTone, { color: string; bg: string; soft: string; border: string; icon: ReactNode }> = {
   ect: {
     color: 'var(--ect-color)',
     bg: 'var(--ect-bg)',
     soft: 'var(--ect-soft)',
-    icon: <Brain size={28} strokeWidth={2.1} aria-hidden="true" />,
+    border: '#B8D2EE',
+    icon: <Brain size={22} strokeWidth={2.1} aria-hidden="true" />,
   },
   rtms: {
     color: 'var(--rtms-color)',
     bg: 'var(--rtms-bg)',
     soft: 'var(--rtms-soft)',
-    icon: <Activity size={28} strokeWidth={2.1} aria-hidden="true" />,
+    border: '#B6DECE',
+    icon: <Activity size={22} strokeWidth={2.1} aria-hidden="true" />,
   },
   acuteEct: {
     color: 'var(--akut-color)',
     bg: 'var(--akut-bg)',
     soft: 'var(--akut-soft)',
-    icon: <Siren size={28} strokeWidth={2.1} aria-hidden="true" />,
+    border: 'rgba(180,35,42,0.28)',
+    icon: <Brain size={22} strokeWidth={2.1} aria-hidden="true" />,
   },
 };
 
-const dotColor: Record<StatusTone, string> = {
-  ok: 'var(--ok-color)',
-  warn: 'var(--warn-color)',
-  akut: 'var(--akut-color)',
-};
-
-const rowBg: Record<StatusTone, string> = {
-  ok: 'var(--ok-bg)',
-  warn: 'var(--warn-bg)',
-  akut: 'var(--akut-bg)',
-};
-
-const rowColor: Record<StatusTone, string> = {
-  ok: 'var(--ok-color)',
-  warn: 'var(--warn-color)',
-  akut: 'var(--akut-color)',
+const statusToneStyle: Record<string, { dot: string; label: string }> = {
+  ok:   { dot: 'var(--ok-color)',   label: 'Stabil'  },
+  warn: { dot: 'var(--warn-color)', label: 'Bevaka'  },
+  akut: { dot: 'var(--akut-color)', label: 'Akut'    },
 };
 
 const styles: Record<string, CSSProperties> = {
   card: {
-    minHeight: 360,
-    width: '100%',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    background: 'var(--surface)',
-    padding: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    textAlign: 'left',
+    position: 'relative',
+    borderRadius: 'var(--radius)',
+    padding: 20,
+    boxShadow: '0 5px 16px rgba(23, 32, 51, 0.09)',
+    display: 'flex', flexDirection: 'column',
     cursor: 'pointer',
-    transition: 'border-color 150ms ease, background-color 150ms ease, transform 100ms ease',
+    transition: 'transform 0.14s ease, box-shadow 0.18s ease, border-color 0.18s ease',
+    textAlign: 'left', width: '100%',
   },
-  top: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 16,
-    marginBottom: 24,
+  needsAction: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+    textTransform: 'uppercase', color: 'var(--akut-color)',
+    marginBottom: 10,
   },
+  needsActionDot: {
+    width: 6, height: 6, borderRadius: 999,
+    background: 'var(--akut-color)', display: 'inline-block',
+  },
+  top: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 },
+  topLeft: { display: 'flex', gap: 12, minWidth: 0 },
   iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    width: 40, height: 40, borderRadius: 10,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  dotWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 28,
-    color: 'var(--text-muted)',
-    fontSize: 13,
-    fontWeight: 700,
+  name: { fontSize: 18, fontWeight: 750, letterSpacing: '-0.01em' },
+  desc: { fontSize: 12.5, color: '#45566B', marginTop: 2, fontWeight: 500 },
+  statusWord: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 750, color: '#45566B', whiteSpace: 'nowrap' },
+  dot: { width: 8, height: 8, borderRadius: 999 },
+  capBlock: { marginTop: 16 },
+  capNum: { display: 'flex', alignItems: 'baseline', gap: 7 },
+  capBig: { fontSize: 26, fontWeight: 780, letterSpacing: '-0.02em', color: 'var(--text-main)' },
+  capLabel: { fontSize: 13, color: '#45566B', fontWeight: 700 },
+  track: { marginTop: 9, height: 9, borderRadius: 999, background: '#E4EAF1', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(23,32,51,0.08)' },
+  capLine: { marginTop: 11, display: 'flex', alignItems: 'center', gap: 14, fontSize: 12.5, fontWeight: 650, color: '#45566B', flexWrap: 'wrap' as const },
+  seg: {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    borderRadius: 7, padding: '5px 8px', cursor: 'pointer',
+    fontSize: 12.5, fontWeight: 650,
   },
-  dot: {
-    width: 11,
-    height: 11,
-    borderRadius: 999,
-    flexShrink: 0,
-  },
-  eyebrow: {
-    color: 'var(--text-subtle)',
-    fontSize: 'var(--type-label)',
-    fontWeight: 700,
-    letterSpacing: 0,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  title: {
-    margin: 0,
-    color: 'var(--text-main)',
-    fontSize: 26,
-    lineHeight: 1.15,
-    fontWeight: 750,
-  },
-  description: {
-    margin: '8px 0 0',
-    color: 'var(--text-muted)',
-    fontSize: 14,
-    lineHeight: 1.55,
-  },
-  capacity: {
-    marginTop: 16,
-    color: 'var(--text-main)',
-    fontSize: 15,
-    fontWeight: 750,
-  },
-  progress: {
-    height: 10,
-    marginTop: 10,
-    display: 'flex',
-    overflow: 'hidden',
-    borderRadius: 5,
-    background: '#E8EDF3',
-  },
-  progressLegend: {
-    marginTop: 7,
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '5px 12px',
-    color: 'var(--text-muted)',
-    fontSize: 11,
-    fontWeight: 700,
-  },
-  operationalAlert: {
-    width: '100%',
-    marginTop: 14,
-    border: '1px solid rgba(168, 100, 5, 0.38)',
-    borderRadius: 8,
-    background: 'var(--warn-bg)',
-    color: 'var(--warn-color)',
-    padding: '10px 11px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    cursor: 'pointer',
-    textAlign: 'left',
-  },
-  alertContent: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 8,
-    minWidth: 0,
-  },
-  alertLabel: {
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  alertDetail: {
-    marginTop: 2,
-    fontSize: 11,
-    lineHeight: 1.35,
-  },
-  legendItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
+  segDot: { width: 7, height: 7, borderRadius: 999 },
+  footer: { marginTop: 'auto', paddingTop: 14, display: 'flex', alignItems: 'center', gap: 10 },
+  acuteChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 7,
+    background: 'var(--akut-bg)', color: 'var(--akut-color)',
+    border: '1px solid rgba(180,35,42,0.28)', borderRadius: 999,
+    padding: '6px 12px 6px 8px', fontSize: 12.5, fontWeight: 750,
+    cursor: 'pointer', transition: 'background 0.15s',
     whiteSpace: 'nowrap',
   },
-  legendDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    flexShrink: 0,
+  acuteCount: {
+    minWidth: 18, height: 18, padding: '0 4px', borderRadius: 999,
+    background: 'var(--akut-color)', color: '#fff', fontSize: 11, fontWeight: 800,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   },
-  rows: {
-    display: 'grid',
-    gap: 8,
-    marginTop: 'auto',
-    paddingTop: 24,
+  calmNote: { fontSize: 12, color: '#526174', fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6 },
+  bookBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    borderRadius: 'var(--radius-sm)', padding: '5px 10px',
+    fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+    transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
   },
-  row: {
-    minHeight: 48,
-    border: '1px solid transparent',
-    borderRadius: 8,
-    padding: '9px 11px 9px 12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+  openBtn: {
+    marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
+    borderRadius: 'var(--radius-sm)', padding: '8px 13px', fontSize: 13, fontWeight: 750,
     cursor: 'pointer',
-    fontSize: 14,
-    fontWeight: 650,
-    textAlign: 'left',
-    transition: 'border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease',
-  },
-  rowAction: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    flexShrink: 0,
-    fontSize: 12,
-    fontWeight: 750,
+    boxShadow: '0 3px 9px rgba(23, 32, 51, 0.10)',
+    transition: 'background 0.18s, color 0.18s, transform 0.15s, box-shadow 0.15s',
   },
 };
 
-function handleKeyboardOpen(event: KeyboardEvent<HTMLDivElement>, route: string, onOpen: (route: string) => void) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    onOpen(route);
-  }
+function parseCapacity(label: string): { booked: number; total: number } {
+  const m = label.match(/(\d+)\s+bokade av\s+(\d+)/i);
+  if (m) return { booked: Number(m[1]), total: Number(m[2]) };
+  const m2 = label.match(/(\d+)/g);
+  if (m2 && m2.length >= 2) return { booked: Number(m2[0]), total: Number(m2[1]) };
+  return { booked: 0, total: 1 };
 }
 
-function CapacityProgress({ module }: { module: ModuleCardData }) {
-  const ready = module.statusRows.find((row) => row.tone === 'ok')?.count ?? 0;
-  const waiting = module.statusRows.find((row) => row.tone === 'warn')?.count ?? 0;
-  const capacityMatch = module.capacityLabel.match(/(\d+)\s+bokade av\s+(\d+)/i);
-  const capacity = capacityMatch ? Number(capacityMatch[2]) : Math.max(ready + waiting, 1);
-  const available = Math.max(capacity - ready - waiting, 0);
-  const percent = (value: number) => `${Math.min((value / capacity) * 100, 100)}%`;
-
-  return (
-    <>
-      <div
-        role="img"
-        aria-label={`${ready} klara, ${waiting} väntande och ${available} lediga platser`}
-        style={styles.progress}
-      >
-        {ready > 0 && <span style={{ width: percent(ready), background: 'var(--ok-color)' }} />}
-        {waiting > 0 && <span style={{ width: percent(waiting), background: 'var(--warn-color)' }} />}
-      </div>
-      <div style={styles.progressLegend}>
-        <span style={styles.legendItem}>
-          <span style={{ ...styles.legendDot, background: 'var(--ok-color)' }} />
-          {ready} klara
-        </span>
-        <span style={styles.legendItem}>
-          <span style={{ ...styles.legendDot, background: 'var(--warn-color)' }} />
-          {waiting} väntar
-        </span>
-        {available > 0 && (
-          <span style={styles.legendItem}>
-            <span style={{ ...styles.legendDot, background: '#B8C4D3' }} />
-            {available} lediga
-          </span>
-        )}
-      </div>
-    </>
-  );
+function handleKey(e: KeyboardEvent<HTMLDivElement>, route: string, onOpen: (r: string) => void) {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(route); }
 }
 
 export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardProps) {
-  const visual = moduleVisuals[module.id];
+  const [hovered, setHovered] = useState(false);
+  const visual = moduleVisuals[module.id] ?? moduleVisuals.ect;
+  const status = statusToneStyle[module.statusTone] ?? statusToneStyle.ok;
+  const { booked, total } = parseCapacity(module.capacityLabel);
+  const pct = total > 0 ? Math.round((booked / total) * 100) : 0;
+
+  const readyRow  = module.statusRows.find((r) => r.tone === 'ok');
+  const waitRow   = module.statusRows.find((r) => r.tone === 'warn');
+  const akutRow   = module.statusRows.find((r) => r.tone === 'akut');
+  const akutCount = akutRow?.count ?? 0;
+  const available = Math.max(total - booked, 0);
 
   return (
     <div
+      className="module-card-interactive"
       role="button"
       tabIndex={0}
       aria-label={`Öppna ${module.title}`}
       onClick={() => onOpen(module.route)}
-      onKeyDown={(event) => handleKeyboardOpen(event, module.route, onOpen)}
+      onKeyDown={(e) => handleKey(e, module.route, onOpen)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       style={{
         ...styles.card,
-        borderTop: `4px solid ${visual.color}`,
-      }}
-      onMouseEnter={(event) => {
-        event.currentTarget.style.borderColor = visual.color;
-        event.currentTarget.style.backgroundColor = visual.soft;
-      }}
-      onMouseLeave={(event) => {
-        event.currentTarget.style.borderColor = 'var(--border)';
-        event.currentTarget.style.borderTopColor = visual.color;
-        event.currentTarget.style.backgroundColor = 'var(--surface)';
-        event.currentTarget.style.transform = 'scale(1)';
-      }}
-      onMouseDown={(event) => {
-        event.currentTarget.style.transform = 'scale(0.98)';
-      }}
-      onMouseUp={(event) => {
-        event.currentTarget.style.transform = 'scale(1)';
-      }}
-      onFocus={(event) => {
-        event.currentTarget.style.outline = `3px solid ${visual.color}40`;
-        event.currentTarget.style.outlineOffset = '3px';
-      }}
-      onBlur={(event) => {
-        event.currentTarget.style.outline = 'none';
+        background: module.id === 'ect'
+          ? hovered ? '#DCECF9' : '#EAF3FB'
+          : module.id === 'rtms'
+            ? hovered ? '#DCEFE8' : '#E8F5F0'
+            : hovered ? '#F9DCDE' : '#FCEBEC',
+        border: akutCount > 0 ? '1px solid rgba(180,35,42,0.45)' : `1px solid ${visual.border}`,
+        borderTop: `3px solid ${visual.color}`,
+        transform: hovered ? 'translateY(-4px)' : 'none',
+        boxShadow: hovered ? '0 12px 28px rgba(23, 32, 51, 0.15)' : '0 5px 16px rgba(23, 32, 51, 0.09)',
       }}
     >
+      {akutCount > 0 && (
+        <div style={styles.needsAction}>
+          <span style={styles.needsActionDot} />
+          Kräver åtgärd
+        </div>
+      )}
+
       <div style={styles.top}>
-        <div style={{ display: 'flex', gap: 16, minWidth: 0 }}>
-          <div style={{ ...styles.iconBox, color: visual.color, background: visual.bg }}>{visual.icon}</div>
+        <div style={styles.topLeft}>
+          <div style={{ ...styles.iconBox, background: visual.bg, color: visual.color }}>{visual.icon}</div>
           <div style={{ minWidth: 0 }}>
-            <div style={styles.eyebrow}>Modul</div>
-            <h2 style={styles.title}>{module.title}</h2>
-            <p style={styles.description}>{module.description}</p>
-            <div style={styles.capacity}>{module.capacityLabel}</div>
-            <CapacityProgress module={module} />
-            {module.operationalAlert && (
-              <button
-                type="button"
-                style={styles.operationalAlert}
-                aria-label={`${module.operationalAlert.label}. ${module.operationalAlert.detail}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onStatusOpen(module.operationalAlert!.route);
-                }}
-              >
-                <span style={styles.alertContent}>
-                  <AlertTriangle size={17} strokeWidth={2.2} aria-hidden="true" />
-                  <span>
-                    <span style={styles.alertLabel}>{module.operationalAlert.label}</span>
-                    <span style={{ ...styles.alertDetail, display: 'block' }}>{module.operationalAlert.detail}</span>
-                  </span>
-                </span>
-                <ArrowRight size={17} strokeWidth={2.2} aria-hidden="true" />
-              </button>
-            )}
+            <div style={styles.name}>{module.title}</div>
+            <div style={styles.desc}>{module.description}</div>
           </div>
         </div>
+        <span style={styles.statusWord}>
+          <span style={{ ...styles.dot, background: status.dot }} />
+          {status.label}
+        </span>
+      </div>
 
-        <div style={styles.dotWrap}>
-          <span style={{ ...styles.dot, background: dotColor[module.statusTone] }} />
-          {module.statusTone === 'ok' ? 'Stabil' : module.statusTone === 'warn' ? 'Bevaka' : 'Akut'}
+      <div style={{
+        ...styles.capBlock,
+        background: 'rgba(255,255,255,0.72)',
+        border: `1px solid ${visual.border}`,
+        borderRadius: 9,
+        padding: '12px 14px',
+      }}>
+        <div style={styles.capNum}>
+          <span style={styles.capBig}>
+            {booked}<span style={{ color: 'var(--text-subtle)', fontWeight: 600, fontSize: 16 }}> / {total}</span>
+          </span>
+          <span style={styles.capLabel}>platser bokade</span>
+        </div>
+        <div style={styles.track}>
+          <div style={{ height: '100%', borderRadius: 999, background: visual.color, width: `${pct}%`, transition: 'width 0.5s ease' }} />
+        </div>
+        <div style={styles.capLine}>
+          {readyRow && (
+            <button
+              type="button"
+              className="module-status-chip"
+              style={{ ...styles.seg, color: '#0F6840', background: '#DDF2E7', border: '1px solid #A9D8BE' }}
+              onClick={(event) => { event.stopPropagation(); onStatusOpen(readyRow.route); }}
+              aria-label={`${readyRow.count} ${readyRow.label}`}
+            >
+              <span style={{ ...styles.segDot, background: 'var(--ok-color)' }} />
+              <b style={{ color: 'var(--text-main)' }}>{readyRow.count}</b> klara
+              <ArrowRight size={12} aria-hidden="true" />
+            </button>
+          )}
+          {waitRow && (
+            <button
+              type="button"
+              className="module-status-chip"
+              style={{ ...styles.seg, color: '#875100', background: '#FFF0CC', border: '1px solid #E6C77A' }}
+              onClick={(event) => { event.stopPropagation(); onStatusOpen(waitRow.route); }}
+              aria-label={`${waitRow.count} ${waitRow.label}`}
+            >
+              <span style={{ ...styles.segDot, background: 'var(--warn-color)' }} />
+              <b style={{ color: 'var(--text-main)' }}>{waitRow.count}</b> väntar
+              <ArrowRight size={12} aria-hidden="true" />
+            </button>
+          )}
+          {available > 0 && (
+            <button
+              type="button"
+              className="module-status-chip"
+              style={{ ...styles.seg, color: '#45566B', background: '#E8EEF4', border: '1px solid #C3CEDA' }}
+              onClick={(event) => { event.stopPropagation(); onOpen(`${module.route}&action=book`); }}
+              aria-label={`${available} lediga platser, boka tid`}
+            >
+              <span style={{ ...styles.segDot, background: 'var(--border-strong)' }} />
+              <b style={{ color: 'var(--text-main)' }}>{available}</b> lediga
+              <Plus size={12} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 
-      <div style={styles.rows}>
-        {module.statusRows.map((row) => (
+      <div style={{ ...styles.footer, paddingLeft: 2, paddingRight: 2 }}>
+        {akutCount > 0 ? (
           <button
-            key={`${module.id}-${row.tone}-${row.label}`}
             type="button"
-            aria-label={`${module.title}: ${row.count} ${row.label}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onStatusOpen(row.route);
-            }}
-            style={{
-              ...styles.row,
-              background: rowBg[row.tone],
-              color: rowColor[row.tone],
-            }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.borderColor = rowColor[row.tone];
-              event.currentTarget.style.boxShadow = `0 3px 10px ${rowColor[row.tone]}20`;
-              event.currentTarget.style.transform = 'translateX(3px)';
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.borderColor = 'transparent';
-              event.currentTarget.style.boxShadow = 'none';
-              event.currentTarget.style.transform = 'translateX(0)';
-            }}
-            onFocus={(event) => {
-              event.currentTarget.style.outline = `3px solid ${rowColor[row.tone]}40`;
-              event.currentTarget.style.outlineOffset = '2px';
-              event.currentTarget.style.borderColor = rowColor[row.tone];
-            }}
-            onBlur={(event) => {
-              event.currentTarget.style.outline = 'none';
-              event.currentTarget.style.borderColor = 'transparent';
-            }}
+            style={styles.acuteChip}
+            aria-label={`${akutCount} akuta fall – öppna akutflödet`}
+            onClick={(e) => { e.stopPropagation(); if (akutRow) onStatusOpen(akutRow.route); }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#fadddf'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--akut-bg)'; }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <StatusBadge tone={row.tone} label={String(row.count)} pulse={row.tone === 'akut' && row.count > 0} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.label}</span>
-            </span>
-            <span style={styles.rowAction}>
-              Öppna
-              <ArrowRight size={15} strokeWidth={2.2} aria-hidden="true" />
-            </span>
+            <span style={styles.acuteCount}>{akutCount}</span>
+            akuta — öppna
           </button>
-        ))}
+        ) : (
+          <span style={styles.calmNote}>
+            <Check size={14} style={{ color: 'var(--ok-color)' }} aria-hidden="true" /> Inga akuta
+          </span>
+        )}
+
+        {available > 0 && hovered && (
+          <button
+            type="button"
+            style={{ ...styles.bookBtn, background: visual.bg, color: visual.color, border: `1px solid ${visual.border}` }}
+            onClick={(e) => { e.stopPropagation(); onOpen(`${module.route}&action=book`); }}
+          >
+            <Plus size={13} aria-hidden="true" /> Boka tid
+          </button>
+        )}
+
+        <span
+          style={{
+            ...styles.openBtn,
+            border: `1px solid ${visual.border}`,
+            background: hovered ? visual.color : '#FFFFFF',
+            color: hovered ? '#fff' : visual.color,
+            transform: hovered ? 'translateY(-1px)' : 'none',
+            boxShadow: hovered ? `0 6px 14px ${visual.color}33` : '0 3px 9px rgba(23, 32, 51, 0.10)',
+          }}
+        >
+          Öppna {module.title} <ArrowRight size={15} aria-hidden="true" />
+        </span>
       </div>
     </div>
   );

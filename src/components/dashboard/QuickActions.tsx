@@ -12,32 +12,32 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 24,
   },
   label: {
-    marginBottom: 8,
-    color: 'var(--text-subtle)',
-    fontSize: 'var(--type-label)',
+    marginBottom: 12,
+    color: '#526174',
+    fontSize: 12,
     fontWeight: 700,
-    letterSpacing: 0,
+    letterSpacing: '0.03em',
     textTransform: 'uppercase',
   },
   grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: 12,
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 10,
   },
   button: {
-    minHeight: 48,
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    background: 'var(--surface)',
+    border: '1px solid #AFC2D5',
+    borderRadius: 'var(--radius-sm)',
+    background: '#F7FAFD',
     color: 'var(--text-main)',
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: '0 16px',
-    fontSize: 14,
+    gap: 9,
+    padding: '10px 15px',
+    fontSize: 13.5,
     fontWeight: 700,
     cursor: 'pointer',
+    boxShadow: '0 3px 9px rgba(23, 32, 51, 0.07)',
+    transition: 'background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s, box-shadow 0.14s',
   },
 };
 
@@ -50,30 +50,38 @@ export default function QuickActions({ actions, onNavigate, label = 'Snabbåtgä
       <div style={styles.grid}>
         {actions.map((action) => {
           const Icon = action.icon;
-          const isAkut = action.tone === 'akut';
 
           return (
             <button
+              className="quick-action-button"
               key={action.label}
               type="button"
               aria-label={action.ariaLabel}
               onClick={() => onNavigate(action.route)}
-              style={{
-                ...styles.button,
-                borderColor: isAkut ? 'var(--akut-color)' : 'var(--border)',
-                background: isAkut ? 'var(--akut-bg)' : 'var(--surface)',
-                color: isAkut ? 'var(--akut-color)' : 'var(--text-main)',
-                fontWeight: isAkut ? 850 : 750,
+              style={styles.button}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.background = 'var(--ect-bg)';
+                event.currentTarget.style.borderColor = '#7FA9D2';
+                event.currentTarget.style.color = 'var(--ect-color)';
+                event.currentTarget.style.transform = 'translateY(-2px)';
+                event.currentTarget.style.boxShadow = '0 7px 16px rgba(24, 95, 165, 0.14)';
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.background = '#F7FAFD';
+                event.currentTarget.style.borderColor = '#AFC2D5';
+                event.currentTarget.style.color = 'var(--text-main)';
+                event.currentTarget.style.transform = 'none';
+                event.currentTarget.style.boxShadow = '0 3px 9px rgba(23, 32, 51, 0.07)';
               }}
               onFocus={(event) => {
-                event.currentTarget.style.outline = `3px solid ${isAkut ? 'rgba(180, 35, 42, 0.24)' : 'var(--focus-ring)'}`;
+                event.currentTarget.style.outline = '3px solid var(--focus-ring)';
                 event.currentTarget.style.outlineOffset = '2px';
               }}
               onBlur={(event) => {
                 event.currentTarget.style.outline = 'none';
               }}
             >
-              <Icon size={18} aria-hidden="true" />
+              <Icon size={18} color="var(--ect-color)" aria-hidden="true" />
               {action.label}
             </button>
           );

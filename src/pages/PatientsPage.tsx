@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPatients, createPatient, updatePatient, deletePatient } from '../api/patients';
 import type { PatientDto, CreatePatientDto } from '../types';
+import BackendErrorState from '../components/common/BackendErrorState';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import Spinner from '../components/common/Spinner';
 
 interface PatientModalProps {
   existing?: PatientDto;
@@ -43,7 +46,7 @@ function PatientModal({ existing, onClose }: PatientModalProps) {
           <h2 className="text-lg font-semibold text-[#1A2332]">
             {isEdit ? 'Redigera patient' : 'Ny patient'}
           </h2>
-          <button onClick={onClose} className="text-[#8494AA] hover:text-[#1A2332] text-xl leading-none">✕</button>
+          <button onClick={onClose} aria-label="Stäng dialog" className="text-[#8494AA] hover:text-[#1A2332] text-xl leading-none">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -102,12 +105,15 @@ function PatientModal({ existing, onClose }: PatientModalProps) {
 export default function PatientsPage() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; patient?: PatientDto }>({ open: false });
+  const [confirmDialog, setConfirmDialog] = useState<{ patientId: number; name: string } | null>(null);
   const [search, setSearch] = useState('');
 
-  const { data: patients = [], isLoading } = useQuery({
+  const patientsQuery = useQuery({
     queryKey: ['patients'],
     queryFn: getPatients,
   });
+  const patients = patientsQuery.data ?? [];
+  const isLoading = patientsQuery.isLoading;
 
   const deleteMutation = useMutation({
     mutationFn: deletePatient,
@@ -129,11 +135,21 @@ export default function PatientsPage() {
         </div>
         <button
           onClick={() => setModal({ open: true })}
-          className="bg-[#1A4F8A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1a3f6f] transition-colors"
+          disabled={patientsQuery.isError}
+          className="bg-[#1A4F8A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1a3f6f] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Ny patient
         </button>
       </div>
+
+      {patientsQuery.isError && (
+        <div className="mb-4">
+          <BackendErrorState
+            error={patientsQuery.error}
+            onRetry={() => void patientsQuery.refetch()}
+          />
+        </div>
+      )}
 
       <div className="mb-4">
         <input
@@ -146,8 +162,13 @@ export default function PatientsPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-[#DDE3EC]">
-        {isLoading ? (
-          <div className="p-8 text-center text-sm text-[#8494AA]">Laddar...</div>
+        {patientsQuery.isError ? (
+          <div className="p-8 text-center text-sm font-medium text-[#854D0E]">Patientdata visas igen när anslutningen fungerar.</div>
+        ) : isLoading ? (
+          <div className="p-8 flex items-center justify-center gap-2 text-sm text-[#8494AA]">
+            <Spinner size={18} />
+            Laddar patienter...
+          </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-sm text-[#8494AA]">
             {search ? 'Inga patienter matchar sökningen.' : 'Inga patienter registrerade.'}
@@ -157,10 +178,10 @@ export default function PatientsPage() {
             <table className="w-full">
               <thead>
                 <tr className="text-left text-xs font-medium text-[#8494AA] uppercase tracking-wider border-b border-[#DDE3EC]">
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Namn</th>
-                  <th className="px-4 py-3">Personnummer</th>
-                  <th className="px-4 py-3"></th>
+                  <th scope="col" className="px-4 py-3">ID</th>
+                  <th scope="col" className="px-4 py-3">Namn</th>
+                  <th scope="col" className="px-4 py-3">Personnummer</th>
+                  <th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -178,9 +199,7 @@ export default function PatientsPage() {
                           Redigera
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm(`Radera ${p.fullName}?`)) deleteMutation.mutate(p.patientId);
-                          }}
+                          onClick={() => setConfirmDialog({ patientId: p.patientId, name: p.fullName })}
                           className="text-xs text-[#C42B2B] hover:underline"
                         >
                           Radera
@@ -199,6 +218,19 @@ export default function PatientsPage() {
         <PatientModal
           existing={modal.patient}
           onClose={() => setModal({ open: false })}
+        />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          title="Radera patient"
+          message={`${confirmDialog.name} tas bort permanent och kan inte återställas.`}
+          confirmLabel="Radera"
+          onConfirm={() => {
+            deleteMutation.mutate(confirmDialog.patientId);
+            setConfirmDialog(null);
+          }}
+          onCancel={() => setConfirmDialog(null)}
         />
       )}
     </div>
