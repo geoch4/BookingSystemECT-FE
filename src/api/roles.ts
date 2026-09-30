@@ -2,23 +2,23 @@ import client from './client';
 import type { RoleDto } from '../types';
 
 // ─── Role API ─────────────────────────────────────────────────────────────────
-// Den här filen hanterar roller, till exempel Admin eller Sjuksköterska.
+// This file handles roles, for example Admin or Nurse.
 
-// Typen för att skapa eller uppdatera en roll.
+// The type used to create or update a role.
 interface CreateRoleDto { roleName: string; }
 
-// Hämtar alla roller.
+// Fetches all roles.
 export const getRoles = () =>
   client.get<RoleDto[]>('/role').then((r) => r.data);
 
-// Skapar en ny roll.
+// Creates a new role.
 export const createRole = (dto: CreateRoleDto) =>
   client.post<RoleDto>('/role', dto).then((r) => r.data);
 
-// Uppdaterar en roll med ett specifikt roleId.
+// Updates a role by a specific roleId.
 export const updateRole = (id: number, dto: CreateRoleDto) =>
   client.put(`/role/${id}`, dto);
 
-// Raderar en roll.
+// Deletes a role.
 export const deleteRole = (id: number) =>
   client.delete(`/role/${id}`);

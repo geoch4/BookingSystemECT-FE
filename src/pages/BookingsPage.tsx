@@ -1,18 +1,20 @@
 import { useState, Fragment } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getBookings, createBooking, updateBooking, deleteBooking } from '../api/bookings';
 import { getPatients } from '../api/patients';
 import { useAuth } from '../context/useAuth';
 import type { BookingDto, BookingPriority, BookingStatus, CreateBookingDto, TreatmentType } from '../types';
 import { TREATMENT_TYPE_OPTIONS, TREATMENT_TYPE_LABELS, isEctType } from '../types';
-// Används för att visa backend-metadata med lokal fallback för äldre bokningar.
+// Used to show backend metadata with a local fallback for older bookings.
 import { deleteBookingReferralMeta, getAllBookingReferralMeta, getReferralMetaForBooking } from '../utils/bookingMeta';
-import { addDemoBooking, getDemoBookings } from '../utils/demoBookings';
+import { addDemoBooking, deleteDemoBooking, getDemoBookings, updateDemoBooking } from '../utils/demoBookings';
 import BackendErrorState from '../components/common/BackendErrorState';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Spinner from '../components/common/Spinner';
-import { addHistoryEntry, getAllBookingHistory, type BookingHistoryEntry } from '../utils/bookingHistory';
+import { addHistoryEntry, deleteBookingHistory, getAllBookingHistory, type BookingHistoryEntry } from '../utils/bookingHistory';
 import { DEMO_MODE } from '../config/demo';
+import { fallbackPatient } from '../utils/referralCases';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   Pending: 'Väntande',
@@ -49,6 +51,9 @@ const MOCK_BOOKINGS: BookingDto[] = [
   { bookingId: -8, date: '2026-06-10T14:00:00', patientId: 8, treatmentTypeId: 7, createdById: 1, createdAt: '2026-06-09T08:12:00', priority: 'Green', status: 'Cancelled', referralDepartment: 'Affektiv mottagning', referralContactName: 'Johan Berg', referralContactPhone: '031-342 11 20' },
 ];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Formats an ISO date string as a Swedish date/time for the bookings table.
 function formatDateTime(dateStr: string) {
   return new Date(dateStr).toLocaleString('sv-SE', {
     year: 'numeric',
@@ -59,12 +64,14 @@ function formatDateTime(dateStr: string) {
   });
 }
 
+// Converts an ISO date string to the `datetime-local`-style value the form state uses.
 function toLocalDatetimeValue(isoStr: string) {
   const d = new Date(isoStr);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Generates a fixed sequence of 15-minute booking slots starting at the given time.
 function createBookingSlots(startHour: number, startMinute: number, count: number) {
   return Array.from({ length: count }, (_, index) => {
     const startMinutes = startHour * 60 + startMinute + index * 15;
@@ -87,8 +94,10 @@ interface BookingModalProps {
   bookings: BookingDto[];
   onClose: () => void;
   onPreviewCreate?: (dto: CreateBookingDto) => void;
+  onPreviewUpdate?: (booking: BookingDto, dto: CreateBookingDto) => void;
 }
 
+// Checks whether another (non-cancelled) booking already occupies this exact date/time.
 function isSlotOccupied(bookings: BookingDto[], date: string, excludeBookingId?: number) {
   return bookings.some((booking) =>
     booking.status !== 'Cancelled'
@@ -97,12 +106,18 @@ function isSlotOccupied(bookings: BookingDto[], date: string, excludeBookingId?:
   );
 }
 
-function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingModalProps) {
+// ─── Create/edit booking modal ─────────────────────────────────────────────────
+
+function BookingModal({ existing, bookings, onClose, onPreviewCreate, onPreviewUpdate }: BookingModalProps) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  // If an existing booking was passed in, this modal edits it instead of creating a new one.
   const isEdit = !!existing;
 
   const { data: patients = [] } = useQuery({ queryKey: ['patients'], queryFn: getPatients });
+  const modalPatients = patients.length > 0
+    ? patients
+    : Array.from(new Set(bookings.map((booking) => booking.patientId))).map(fallbackPatient);
 
   const [form, setForm] = useState<CreateBookingDto>({
     date: existing ? toLocalDatetimeValue(existing.date) : toLocalDatetimeValue(new Date().toISOString()),
@@ -115,33 +130,37 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
     referralDepartment: existing?.referralDepartment,
     referralContactName: existing?.referralContactName,
     referralContactPhone: existing?.referralContactPhone,
+    cancellationReason: existing?.cancellationReason,
   });
 
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [cancellationReason, setCancellationReason] = useState(
-    isEdit ? '' : '',
-  );
+  const [cancellationReason, setCancellationReason] = useState(existing?.cancellationReason ?? '');
+  // The available slots switch between the ECT and rTMS time windows based on treatment type.
   const bookingSlots = isEctType(form.treatmentTypeId) ? ECT_BOOKING_SLOTS : RTMS_BOOKING_SLOTS;
   const bookingWindowLabel = isEctType(form.treatmentTypeId)
     ? 'ECT: 08:00–12:00'
     : 'rTMS: 13:00–15:30';
   const selectedDate = form.date.slice(0, 10);
+  // Other bookings on the same day (excluding this one, if editing) that block a time slot.
   const occupiedBookings = bookings.filter((booking) =>
     booking.status !== 'Cancelled'
     && booking.bookingId !== existing?.bookingId
     && booking.date.slice(0, 10) === selectedDate
   );
+  // Maps each occupied time to the patient name shown in the "Upptagen" hint.
   const occupiedByTime = new Map(
     occupiedBookings.map((booking) => [
       booking.date.slice(11, 16),
-      patients.find((patient) => patient.patientId === booking.patientId)?.fullName ?? 'Upptagen',
+      modalPatients.find((patient) => patient.patientId === booking.patientId)?.fullName ?? 'Upptagen',
     ]),
   );
   const requestedTime = form.date.slice(11, 16);
+  // Keeps the currently selected time if it's still free, otherwise falls back to the first free slot.
   const selectedTime = bookingSlots.some((slot) => slot.value === requestedTime && !occupiedByTime.has(slot.value))
     ? requestedTime
     : bookingSlots.find((slot) => !occupiedByTime.has(slot.value))?.value ?? '';
 
+  // Changes the date and re-picks a free time slot for that new date if needed.
   function updateDate(date: string) {
     const occupiedTimes = new Set(
       bookings
@@ -158,10 +177,12 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
     setForm((current) => ({ ...current, date: `${date}T${nextTime}` }));
   }
 
+  // Changes just the time, keeping the currently selected date.
   function updateTime(time: string) {
     setForm((current) => ({ ...current, date: `${selectedDate}T${time}` }));
   }
 
+  // Switches treatment type and jumps to the first free slot in that type's time window.
   function updateTreatmentType(treatmentTypeId: TreatmentType) {
     const slots = isEctType(treatmentTypeId) ? ECT_BOOKING_SLOTS : RTMS_BOOKING_SLOTS;
     const nextTime = slots.find((slot) => !occupiedByTime.has(slot.value))?.value ?? '';
@@ -172,6 +193,8 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
     }));
   }
 
+  // Re-checks the slot against the latest bookings right before creating, to catch
+  // a race where someone else booked the same time between opening and submitting the form.
   const createMutation = useMutation({
     mutationFn: async (dto: CreateBookingDto) => {
       const latestBookings = await getBookings();
@@ -186,11 +209,16 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
     ),
   });
 
+  // Same race-condition check as createMutation, but excludes this booking's own current slot.
   const updateMutation = useMutation({
     mutationFn: async (dto: CreateBookingDto) => {
       const latestBookings = await getBookings();
       if (isSlotOccupied(latestBookings, dto.date, existing!.bookingId)) throw new Error('SLOT_OCCUPIED');
-      return updateBooking(existing!.bookingId, dto);
+      return updateBooking(existing!.bookingId, dto, {
+        auditReason: dto.status === 'Cancelled'
+          ? cancellationReason || 'Avbokning utan angiven orsak'
+          : `Bokning uppdaterad. Status ${dto.status}. Prioritet ${dto.priority}.`,
+      });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['bookings'] }); onClose(); },
     onError: (error) => setSubmitError(
@@ -209,12 +237,17 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
       setSubmitError('Det finns inga lediga tider kvar på valt datum.');
       return;
     }
-    const dto = { ...form, date: `${selectedDate}T${selectedTime}:00` };
+    const dto = {
+      ...form,
+      date: `${selectedDate}T${selectedTime}:00`,
+      cancellationReason: form.status === 'Cancelled' ? cancellationReason || undefined : undefined,
+    };
     if (isSlotOccupied(bookings, dto.date, existing?.bookingId)) {
       setSubmitError('Den valda tiden är redan bokad. Välj en annan ledig slot.');
       return;
     }
     if (isEdit) {
+      // Only log a history entry when status or priority actually changed.
       if (existing && (existing.status !== dto.status || existing.priority !== dto.priority)) {
         addHistoryEntry(existing.bookingId, {
           timestamp: new Date().toISOString(),
@@ -225,7 +258,12 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
           cancellationReason: dto.status === 'Cancelled' ? cancellationReason || undefined : undefined,
         });
       }
-      updateMutation.mutate(dto);
+      if (onPreviewUpdate && existing) {
+        onPreviewUpdate(existing, dto);
+        onClose();
+      } else {
+        updateMutation.mutate(dto);
+      }
     } else if (onPreviewCreate) {
       onPreviewCreate(dto);
       onClose();
@@ -317,7 +355,7 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
               className="w-full px-3 py-2.5 bg-[#F9FBFD] border border-[#D8E0EA] rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]/30 focus:border-[#1A4F8A]"
             >
               <option value="">Välj patient...</option>
-              {patients.map((p) => (
+              {modalPatients.map((p) => (
                 <option key={p.patientId} value={p.patientId}>{p.fullName}</option>
               ))}
             </select>
@@ -393,8 +431,11 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate }: BookingM
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function BookingsPage() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [modal, setModal] = useState<{ open: boolean; booking?: BookingDto }>({ open: false });
   const [confirmDialog, setConfirmDialog] = useState<{ bookingId: number } | null>(null);
   const [filter, setFilter] = useState<BookingStatus | 'all'>('all');
@@ -410,11 +451,22 @@ export default function BookingsPage() {
   const patientsQuery = useQuery({ queryKey: ['patients'], queryFn: getPatients });
   const apiBookings = bookingsQuery.data ?? [];
   const patients = patientsQuery.data ?? [];
-  const isLoading = bookingsQuery.isLoading;
-  const usingMockData = DEMO_MODE && !bookingsQuery.isError && !isLoading && apiBookings.length === 0;
+  const isLoading = !DEMO_MODE && (bookingsQuery.isLoading || patientsQuery.isLoading);
+  // Falls back to mock/demo bookings only when demo mode is on and the backend has no real data yet.
+  const usingMockData = DEMO_MODE && (bookingsQuery.isError || apiBookings.length === 0);
   const bookings = usingMockData ? [...previewBookings, ...MOCK_BOOKINGS] : apiBookings;
-  const backendUnavailable = bookingsQuery.isError || patientsQuery.isError;
+  const backendUnavailable = !DEMO_MODE && (bookingsQuery.isError || patientsQuery.isError);
+  const isNewBookingFromUrl = searchParams.get('action') === 'new';
 
+  function closeModal() {
+    setModal({ open: false });
+    if (!isNewBookingFromUrl) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('action');
+    setSearchParams(nextParams, { replace: true });
+  }
+
+  // Adds a locally-created demo booking to the preview list (used when running on mock data).
   function addPreviewBooking(dto: CreateBookingDto) {
     const booking = addDemoBooking(dto);
     setPreviewBookings((current) => [booking, ...current]);
@@ -422,16 +474,35 @@ export default function BookingsPage() {
     setFilter('all');
   }
 
+  function updatePreviewBooking(existing: BookingDto, dto: CreateBookingDto) {
+    const updated: BookingDto = { ...existing, ...dto };
+    updateDemoBooking(updated);
+    setPreviewBookings(getDemoBookings());
+    setCreatedMessage('Bokningen uppdaterades i listan.');
+  }
+
+  function removePreviewBooking(bookingId: number) {
+    deleteBookingReferralMeta(bookingId);
+    deleteBookingHistory(bookingId);
+    deleteDemoBooking(bookingId);
+    setPreviewBookings(getDemoBookings());
+    setConfirmDialog(null);
+  }
+
   const deleteMutation = useMutation({
-    mutationFn: deleteBooking,
+    mutationFn: (bookingId: number) => deleteBooking(bookingId, { auditReason: 'Bokning raderad från bokningsvyn.' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['bookings'] }),
   });
 
-  const patientMap = Object.fromEntries(patients.map((p) => [p.patientId, p]));
-  // Hämtar metadata så varje bokningsrad kan visa avdelning/kontakt.
+  const patientMap = Object.fromEntries([
+    ...bookings.map((booking) => [booking.patientId, fallbackPatient(booking.patientId)] as const),
+    ...patients.map((p) => [p.patientId, p] as const),
+  ]);
+  // Fetches metadata so each booking row can show department/contact.
   const referralMetaByBookingId = getAllBookingReferralMeta();
   const historyByBookingId = getAllBookingHistory();
 
+  // Applies the status filter, then sorts newest-first for display.
   const filtered = filter === 'all' ? bookings : bookings.filter((b) => b.status === filter);
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -461,6 +532,21 @@ export default function BookingsPage() {
       {createdMessage && (
         <div className="mb-4 px-4 py-3 rounded-lg border border-[#9CD5B8] bg-[#E8F6EE] text-[#147A4B] text-sm font-medium shadow-[0_4px_12px_rgba(20,122,75,0.10)]">
           {createdMessage}
+        </div>
+      )}
+
+      {DEMO_MODE && (bookingsQuery.isError || patientsQuery.isError) && (
+        <div className="mb-4">
+          <BackendErrorState
+            compact
+            title="Backend kan inte nås - visar exempeldata"
+            message="Listan nedan är mockdata för demo. Starta backend eller kontrollera API-inställningen innan produktion."
+            error={bookingsQuery.error ?? patientsQuery.error}
+            onRetry={() => {
+              void bookingsQuery.refetch();
+              void patientsQuery.refetch();
+            }}
+          />
         </div>
       )}
 
@@ -515,13 +601,14 @@ export default function BookingsPage() {
                 </tr>
               </thead>
               <tbody>
+                {/* One row per booking, plus an optional expandable history row below it */}
                 {sorted.map((b) => {
                   const patient = patientMap[b.patientId];
                   const typeName = TREATMENT_TYPE_LABELS[b.treatmentTypeId] ?? `Typ ${b.treatmentTypeId}`;
                   const referralMeta = getReferralMetaForBooking(b, referralMetaByBookingId[b.bookingId]);
                   const history: BookingHistoryEntry[] = historyByBookingId[b.bookingId] ?? [];
                   const cancellationReason = b.status === 'Cancelled'
-                    ? history.find((e) => e.cancellationReason)?.cancellationReason
+                    ? b.cancellationReason ?? history.find((e) => e.cancellationReason)?.cancellationReason
                     : undefined;
                   const isExpanded = expandedHistoryId === b.bookingId;
 
@@ -572,28 +659,26 @@ export default function BookingsPage() {
                                 Historik ({history.length})
                               </button>
                             )}
-                            {b.bookingId > 0 ? (
-                              <>
-                                <button
-                                  onClick={() => setModal({ open: true, booking: b })}
-                                  className="rounded-md bg-[#EAF4FC] px-2.5 py-1.5 text-xs font-semibold text-[#185FA5] hover:bg-[#D7EAF9] hover:-translate-y-px transition-all whitespace-nowrap"
-                                >
-                                  Redigera
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDialog({ bookingId: b.bookingId })}
-                                  className="rounded-md bg-[#FDEAEA] px-2.5 py-1.5 text-xs font-semibold text-[#C42B2B] hover:bg-[#F8D5D7] hover:-translate-y-px transition-all"
-                                >
-                                  Radera
-                                </button>
-                              </>
-                            ) : (
+                            <button
+                              onClick={() => setModal({ open: true, booking: b })}
+                              className="rounded-md bg-[#EAF4FC] px-2.5 py-1.5 text-xs font-semibold text-[#185FA5] hover:bg-[#D7EAF9] hover:-translate-y-px transition-all whitespace-nowrap"
+                            >
+                              Redigera
+                            </button>
+                            <button
+                              onClick={() => setConfirmDialog({ bookingId: b.bookingId })}
+                              className="rounded-md bg-[#FDEAEA] px-2.5 py-1.5 text-xs font-semibold text-[#C42B2B] hover:bg-[#F8D5D7] hover:-translate-y-px transition-all"
+                            >
+                              Radera
+                            </button>
+                            {b.bookingId < 0 && (
                               <span className="rounded-md bg-[#F0F4F8] px-2.5 py-1.5 text-xs font-medium text-[#64748B]">Exempel</span>
                             )}
                           </div>
                         </td>
                       </tr>
 
+                      {/* Status/priority change history, shown only when this row is expanded */}
                       {isExpanded && (
                         <tr className="border-b border-[#E1E7EF] bg-[#F7F9FC]">
                           <td colSpan={5} className="px-4 py-3">
@@ -634,22 +719,30 @@ export default function BookingsPage() {
         )}
       </div>
 
-      {modal.open && (
+      {/* Create/edit modal. Creates go through the preview flow while running on mock data. */}
+      {(modal.open || isNewBookingFromUrl) && (
         <BookingModal
           existing={modal.booking}
           bookings={bookings}
-          onClose={() => setModal({ open: false })}
+          onClose={closeModal}
           onPreviewCreate={usingMockData && !modal.booking ? addPreviewBooking : undefined}
+          onPreviewUpdate={usingMockData && modal.booking ? updatePreviewBooking : undefined}
         />
       )}
 
+      {/* Delete confirmation, shown before the delete mutation actually fires */}
       {confirmDialog && (
         <ConfirmDialog
           title="Radera bokning"
           message="Bokningen tas bort permanent och kan inte återställas."
           confirmLabel="Radera"
           onConfirm={() => {
+            if (usingMockData && confirmDialog.bookingId < 0) {
+              removePreviewBooking(confirmDialog.bookingId);
+              return;
+            }
             deleteBookingReferralMeta(confirmDialog.bookingId);
+            deleteBookingHistory(confirmDialog.bookingId);
             deleteMutation.mutate(confirmDialog.bookingId);
             setConfirmDialog(null);
           }}

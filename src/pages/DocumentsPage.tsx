@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getDocuments } from '../api/documents';
+import BackendErrorState from '../components/common/BackendErrorState';
+import Spinner from '../components/common/Spinner';
+import type { DocumentDto } from '../types';
 
 // ─── Static document catalogue (from prototype / clinical reality) ─────────────
 // These represent the real clinical documents from the prototype.
@@ -22,7 +27,7 @@ interface ClinicalDocument {
   lank: string;
 }
 
-const DOCUMENTS: ClinicalDocument[] = [
+const FALLBACK_DOCUMENTS: ClinicalDocument[] = [
   {
     id: 1,
     titel: 'ECT – elektrokonvulsiv behandling',
@@ -139,12 +144,14 @@ const DOCUMENTS: ClinicalDocument[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Display config (label + colors) for each document validity status.
 const STATUS_CFG: Record<DocStatus, { label: string; bg: string; text: string; dot: string }> = {
   giltig:       { label: 'Giltig',       bg: 'bg-[#E8F7F1]', text: 'text-[#1A9E5F]', dot: 'bg-[#1A9E5F]' },
   utgarsSnart:  { label: 'Utgår snart',  bg: 'bg-[#FEF3DC]', text: 'text-[#D4860A]', dot: 'bg-[#D4860A]' },
   utgangen:     { label: 'Utgången',     bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', dot: 'bg-[#6B7280]' },
 };
 
+// Display config (label + colors) for each document type.
 const TYPE_CFG: Record<DocType, { label: string; bg: string; text: string }> = {
   rutin:      { label: 'Rutin',      bg: 'bg-[#EFF6FF]', text: 'text-[#2563EB]' },
   checklista: { label: 'Checklista', bg: 'bg-[#F5F0FF]', text: 'text-[#7C3AED]' },
@@ -152,13 +159,51 @@ const TYPE_CFG: Record<DocType, { label: string; bg: string; text: string }> = {
   remissvag:  { label: 'Remissväg', bg: 'bg-[#FEF3DC]', text: 'text-[#D4860A]' },
 };
 
+// Number of whole days between now and the given date (negative if already past).
 function daysUntil(dateStr: string) {
   const diff = new Date(dateStr).getTime() - Date.now();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+function toDocType(value?: string): DocType {
+  const normalized = value?.toLowerCase();
+  if (normalized === 'checklista') return 'checklista';
+  if (normalized === 'riktlinje') return 'riktlinje';
+  if (normalized === 'remissvag' || normalized === 'remissväg') return 'remissvag';
+  return 'rutin';
+}
+
+function toDocStatus(doc: DocumentDto): DocStatus {
+  const validTo = doc.validTo;
+  if (!doc.verified) return 'utgangen';
+  if (!validTo) return 'giltig';
+
+  const days = daysUntil(validTo);
+  if (days < 0) return 'utgangen';
+  if (days <= 90) return 'utgarsSnart';
+  return 'giltig';
+}
+
+function mapApiDocument(doc: DocumentDto): ClinicalDocument {
+  return {
+    id: doc.documentId,
+    titel: doc.title ?? doc.fileName,
+    typ: toDocType(doc.documentType),
+    verksamhet: doc.businessArea ?? 'Ej angiven',
+    version: doc.version ?? '1.0',
+    ansvarig: doc.owner ?? `Användare #${doc.uploadedByUserId}`,
+    giltigFran: doc.validFrom ?? '',
+    giltigTill: doc.validTo ?? '',
+    dokumentId: doc.externalDocumentId ?? String(doc.documentId),
+    status: toDocStatus(doc),
+    beskrivning: doc.description ?? doc.fileName,
+    lank: doc.link ?? '#',
+  };
+}
+
 // ─── Document card ────────────────────────────────────────────────────────────
 
+// A single document's summary card, including its expiry status and external link.
 function DocCard({ doc }: { doc: ClinicalDocument }) {
   const statusCfg = STATUS_CFG[doc.status];
   const typeCfg = TYPE_CFG[doc.typ];
@@ -223,14 +268,18 @@ function DocCard({ doc }: { doc: ClinicalDocument }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ALL_TYPES: Array<DocType | 'all'> = ['all', 'rutin', 'checklista', 'riktlinje', 'remissvag'];
-const ALL_STATUSES: Array<DocStatus | 'all'> = ['all', 'giltig', 'utgarsSnart', 'utgangen'];
 
 export default function DocumentsPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<DocType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<DocStatus | 'all'>('all');
+  const documentsQuery = useQuery({ queryKey: ['documents'], queryFn: getDocuments, retry: 1 });
+  const apiDocuments = documentsQuery.data?.map(mapApiDocument) ?? [];
+  const documents = apiDocuments.length > 0 ? apiDocuments : FALLBACK_DOCUMENTS;
+  const usingFallbackDocuments = documentsQuery.isError || apiDocuments.length === 0;
 
-  const filtered = DOCUMENTS.filter((d) => {
+  // Combines the free-text search with the type and status filters.
+  const filtered = documents.filter((d) => {
     const matchSearch =
       d.titel.toLowerCase().includes(search.toLowerCase()) ||
       d.beskrivning.toLowerCase().includes(search.toLowerCase()) ||
@@ -240,33 +289,39 @@ export default function DocumentsPage() {
     return matchSearch && matchType && matchStatus;
   });
 
-  const giltig = DOCUMENTS.filter((d) => d.status === 'giltig').length;
-  const utgarsSnart = DOCUMENTS.filter((d) => d.status === 'utgarsSnart').length;
-  const utgangen = DOCUMENTS.filter((d) => d.status === 'utgangen').length;
+  // Counts by status for the summary chips, independent of the current filters.
+  const giltig = documents.filter((d) => d.status === 'giltig').length;
+  const utgarsSnart = documents.filter((d) => d.status === 'utgarsSnart').length;
+  const utgangen = documents.filter((d) => d.status === 'utgangen').length;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#1A2332]">Styrdokument</h1>
-        <p className="text-sm text-[#8494AA] mt-0.5">Rutiner, riktlinjer och remissvägar</p>
+        <p className="text-sm text-[#8494AA] mt-0.5">
+          Rutiner, riktlinjer och remissvägar
+          {usingFallbackDocuments && (
+            <span className="ml-2 rounded-full bg-[#EAF4FC] px-2 py-0.5 text-xs font-semibold text-[#185FA5]">
+              Visar katalog
+            </span>
+          )}
+        </p>
       </div>
 
-      {/* Summary */}
-      <div className="flex gap-3 mb-5">
-        {[
-          { label: 'Giltiga', count: giltig, color: 'text-[#1A9E5F]', bg: 'bg-[#E8F7F1]' },
-          { label: 'Utgår snart', count: utgarsSnart, color: 'text-[#D4860A]', bg: 'bg-[#FEF3DC]' },
-          { label: 'Utgångna', count: utgangen, color: 'text-[#6B7280]', bg: 'bg-[#F3F4F6]' },
-        ].map(({ label, count, color, bg }) => (
-          <div key={label} className={`${bg} rounded-lg px-4 py-2 flex items-center gap-2`}>
-            <span className={`text-xl font-bold ${color}`}>{count}</span>
-            <span className={`text-xs font-medium ${color}`}>{label}</span>
-          </div>
-        ))}
-      </div>
+      {documentsQuery.isError && (
+        <div className="mb-4">
+          <BackendErrorState
+            compact
+            title="Dokument-API:t kan inte nås - visar katalog"
+            message="Frontend använder den inbyggda dokumentkatalogen tills backend svarar."
+            error={documentsQuery.error}
+            onRetry={() => { void documentsQuery.refetch(); }}
+          />
+        </div>
+      )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         <input
           type="text"
           placeholder="Sök dokument..."
@@ -287,19 +342,32 @@ export default function DocumentsPage() {
         </div>
 
         <div className="flex gap-1 bg-white border border-[#DDE3EC] rounded-lg p-1">
-          {ALL_STATUSES.map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)}
+          {[
+            { label: 'Giltiga', count: giltig, status: 'giltig' as const, color: 'text-[#1A9E5F]', bg: 'bg-[#E8F7F1]', active: 'bg-[#1A9E5F] text-white' },
+            { label: 'Utgår snart', count: utgarsSnart, status: 'utgarsSnart' as const, color: 'text-[#D4860A]', bg: 'bg-[#FEF3DC]', active: 'bg-[#D4860A] text-white' },
+            { label: 'Utgångna', count: utgangen, status: 'utgangen' as const, color: 'text-[#6B7280]', bg: 'bg-[#F3F4F6]', active: 'bg-[#6B7280] text-white' },
+          ].map(({ label, count, status, color, bg, active }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
               className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                statusFilter === s ? 'bg-[#1A4F8A] text-white' : 'text-[#4B5770] hover:bg-[#F0F4F8]'
-              }`}>
-              {s === 'all' ? 'Alla' : STATUS_CFG[s].label}
+                statusFilter === status ? active : `${bg} ${color} hover:brightness-95`
+              }`}
+            >
+              {count} {label}
             </button>
           ))}
         </div>
       </div>
 
       {/* Results */}
-      {filtered.length === 0 ? (
+      {documentsQuery.isLoading && apiDocuments.length === 0 ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-[#8494AA]">
+          <Spinner size={18} />
+          Laddar dokument...
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-sm text-[#8494AA]">
           Inga dokument matchar sökningen.
         </div>

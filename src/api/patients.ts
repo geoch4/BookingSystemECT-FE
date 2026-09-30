@@ -2,25 +2,41 @@ import client from './client';
 import type { PatientDto, CreatePatientDto } from '../types';
 
 // ─── Patient API ──────────────────────────────────────────────────────────────
-// Den här filen samlar API-anrop som gäller patienter.
+// This file collects API requests related to patients.
 
-// Hämtar alla patienter.
+// Fetches all patients.
 export const getPatients = () =>
-  client.get<PatientDto[]>('/patients').then((r) => r.data);
+  client.get<PatientDto[]>('/patients').then((r) => r.data.map(normalizePatient));
 
-// Hämtar en patient med ett specifikt patientId.
+// Fetches a patient by a specific patientId.
 export const getPatientById = (id: number) =>
-  client.get<PatientDto>(`/patients/${id}`).then((r) => r.data);
+  client.get<PatientDto>(`/patients/${id}`).then((r) => normalizePatient(r.data));
 
-// Skapar en ny patient.
-// dto innehåller namn och personnummer.
+// Creates a new patient.
+// dto contains name and national ID number.
 export const createPatient = (dto: CreatePatientDto) =>
-  client.post<PatientDto>('/patients', dto).then((r) => r.data);
+  client.post<PatientDto>('/patients', normalizePatientPayload(dto)).then((r) => normalizePatient(r.data));
 
-// Uppdaterar en befintlig patient.
+// Updates an existing patient.
 export const updatePatient = (id: number, dto: CreatePatientDto) =>
-  client.put(`/patients/${id}`, dto);
+  client.put(`/patients/${id}`, normalizePatientPayload(dto));
 
-// Raderar en patient.
+// Deletes a patient.
 export const deletePatient = (id: number) =>
   client.delete(`/patients/${id}`);
+
+function normalizePatient(patient: PatientDto): PatientDto {
+  return {
+    ...patient,
+    sourceSystem: patient.sourceSystem ?? 'Manual',
+    integrationStatus: patient.integrationStatus ?? 'Manual',
+  };
+}
+
+function normalizePatientPayload(dto: CreatePatientDto): CreatePatientDto {
+  return {
+    ...dto,
+    sourceSystem: dto.sourceSystem ?? 'Manual',
+    integrationStatus: dto.integrationStatus ?? 'Manual',
+  };
+}

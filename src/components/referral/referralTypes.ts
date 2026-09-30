@@ -9,28 +9,59 @@ export interface HealthDeclaration {
   extraInfo: string;
 }
 
+export interface EctReferralDetails {
+  indication: string;
+  anesthesiaInfo: string;
+  somaticRisk: string;
+  documents: {
+    healthDeclaration: boolean;
+    anesthesiaAssessment: boolean;
+    medicationReview: boolean;
+    somaticAssessment: boolean;
+  };
+}
+
+export interface RtmsReferralDetails {
+  indication: string;
+  previousTreatments: string;
+  contraindicationChecklistComplete: boolean | null;
+  metalImplantsOrDevices: boolean | null;
+  seizureHistory: boolean | null;
+  treatmentGoal: string;
+  documents: {
+    contraindicationChecklist: boolean;
+    implantCheck: boolean;
+    treatmentHistory: boolean;
+    patientInformation: boolean;
+  };
+}
+
 export interface FormState {
   // Step 1
   patient: PatientDto | null;
   newPatientName: string;
   newPatientPnr: string;
+  externalPatientId: string;
   // Step 2
   treatmentType: TreatmentType | null;
   priority: BookingPriority;
   preferredDate: string;
   preferredTime: string;
-  // Dessa fält gör att koordinatorn kan se vilken avdelning som skickat remissen.
+  // These fields let the coordinator see which department sent the referral.
   department: string;
   contactName: string;
   contactPhone: string;
   // Step 3
   health: HealthDeclaration;
+  ect: EctReferralDetails;
+  rtms: RtmsReferralDetails;
 }
 
 export const EMPTY_FORM: FormState = {
   patient: null,
   newPatientName: '',
   newPatientPnr: '',
+  externalPatientId: '',
   treatmentType: null,
   priority: 'Green',
   preferredDate: '',
@@ -45,6 +76,31 @@ export const EMPTY_FORM: FormState = {
     allergi: '',
     lakemedel: '',
     extraInfo: '',
+  },
+  ect: {
+    indication: '',
+    anesthesiaInfo: '',
+    somaticRisk: '',
+    documents: {
+      healthDeclaration: false,
+      anesthesiaAssessment: false,
+      medicationReview: false,
+      somaticAssessment: false,
+    },
+  },
+  rtms: {
+    indication: '',
+    previousTreatments: '',
+    contraindicationChecklistComplete: null,
+    metalImplantsOrDevices: null,
+    seizureHistory: null,
+    treatmentGoal: '',
+    documents: {
+      contraindicationChecklist: false,
+      implantCheck: false,
+      treatmentHistory: false,
+      patientInformation: false,
+    },
   },
 };
 

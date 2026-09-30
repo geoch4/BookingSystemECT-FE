@@ -6,6 +6,8 @@ import BackendErrorState from '../components/common/BackendErrorState';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Spinner from '../components/common/Spinner';
 
+// ─── Create/edit patient modal ─────────────────────────────────────────────────
+
 interface PatientModalProps {
   existing?: PatientDto;
   onClose: () => void;
@@ -13,6 +15,7 @@ interface PatientModalProps {
 
 function PatientModal({ existing, onClose }: PatientModalProps) {
   const qc = useQueryClient();
+  // If an existing patient was passed in, this modal edits it instead of creating a new one.
   const isEdit = !!existing;
 
   const [form, setForm] = useState<CreatePatientDto>({
@@ -20,11 +23,13 @@ function PatientModal({ existing, onClose }: PatientModalProps) {
     socialSecurityNumber: existing?.socialSecurityNumber ?? '',
   });
 
+  // Creates a new patient and refreshes the patient list on success.
   const createMutation = useMutation({
     mutationFn: createPatient,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); onClose(); },
   });
 
+  // Updates the existing patient and refreshes the patient list on success.
   const updateMutation = useMutation({
     mutationFn: (dto: CreatePatientDto) => updatePatient(existing!.patientId, dto),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['patients'] }); onClose(); },
@@ -33,6 +38,7 @@ function PatientModal({ existing, onClose }: PatientModalProps) {
   const isPending = createMutation.isPending || updateMutation.isPending;
   const isError = createMutation.isError || updateMutation.isError;
 
+  // Routes the form submit to create or update depending on the modal mode.
   function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (isEdit) updateMutation.mutate(form);
@@ -102,6 +108,8 @@ function PatientModal({ existing, onClose }: PatientModalProps) {
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function PatientsPage() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; patient?: PatientDto }>({ open: false });
@@ -115,11 +123,13 @@ export default function PatientsPage() {
   const patients = patientsQuery.data ?? [];
   const isLoading = patientsQuery.isLoading;
 
+  // Deletes a patient and refreshes the patient list on success.
   const deleteMutation = useMutation({
     mutationFn: deletePatient,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['patients'] }),
   });
 
+  // Filters the patient list by name or social security number as the user types.
   const filtered = patients.filter(
     (p) =>
       p.fullName.toLowerCase().includes(search.toLowerCase()) ||
@@ -214,6 +224,7 @@ export default function PatientsPage() {
         )}
       </div>
 
+      {/* Create/edit modal, shared for both flows via the optional `patient` prop */}
       {modal.open && (
         <PatientModal
           existing={modal.patient}
@@ -221,6 +232,7 @@ export default function PatientsPage() {
         />
       )}
 
+      {/* Delete confirmation, shown before the delete mutation actually fires */}
       {confirmDialog && (
         <ConfirmDialog
           title="Radera patient"

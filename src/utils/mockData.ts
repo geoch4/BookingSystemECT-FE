@@ -1,14 +1,14 @@
-import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, BarChart3, CheckCircle2, Clock, FileText, ListChecks, Plus, RadioTower } from 'lucide-react';
+﻿import type { LucideIcon } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ListChecks, Plus, RadioTower } from 'lucide-react';
 
-// StatusTone beskriver vilken typ av status en rad eller badge har.
-// ok = klart, warn = behöver bevakas, akut = kräver snabb åtgärd.
+// StatusTone describes what kind of status a row or badge has.
+// ok = done, warn = needs monitoring, akut = requires immediate action.
 export type StatusTone = 'ok' | 'warn' | 'akut';
 
-// ModuleTone används för att skilja mellan ECT och rTMS i komponenterna.
+// ModuleTone is used to distinguish between ECT and rTMS in the components.
 export type ModuleTone = 'ect' | 'rtms' | 'acuteEct';
 
-// Beskriver en bemanningsrad i TESSA-baren.
+// Describes a staffing row in the TESSA bar.
 export interface StaffStatus {
   label: string;
   value: string;
@@ -16,16 +16,15 @@ export interface StaffStatus {
   detail: string;
 }
 
-// Samlad typ för TESSA-statusen på startsidan.
+// Combined type for the TESSA status on the home page.
 export interface TessaMockData {
   summary: string;
   lastUpdated: string;
-  rast: string;
   unreadRemisser: number;
   staff: StaffStatus[];
 }
 
-// En statusrad inne i ett modulkort, till exempel "2 akuta ECT-fall".
+// A status row inside a module card, for example "2 acute ECT cases".
 export interface ModuleStatusRow {
   tone: StatusTone;
   count: number;
@@ -33,7 +32,7 @@ export interface ModuleStatusRow {
   route: string;
 }
 
-// Data som behövs för ett klickbart ECT/rTMS-kort.
+// Data needed for a clickable ECT/rTMS card.
 export interface ModuleCardData {
   id: ModuleTone;
   title: string;
@@ -49,7 +48,7 @@ export interface ModuleCardData {
   statusRows: ModuleStatusRow[];
 }
 
-// Data som behövs för varje snabbknapp på startsidan.
+// Data needed for each quick-action button on the home page.
 export interface QuickActionData {
   label: string;
   route: string;
@@ -58,98 +57,95 @@ export interface QuickActionData {
   icon: LucideIcon;
 }
 
-// landingMock är tillfällig testdata.
-// När backend/API är redo kan samma struktur ersättas med riktig data.
+// landingMock is temporary test data.
+// Once the backend/API is ready, the same structure can be replaced with real data.
 export const landingMock = {
-  // Rollen visas i toppnavigationen.
+  // The role is shown in the top navigation.
   role: 'ECT-koordinator',
 
-  // TESSA visar bemanning, rast och antal olästa remisser.
   tessa: {
-    summary: 'Narkos redo · SSK bemannad · Rast 12:15-12:45',
+    summary: 'Narkos redo · SSK bemannad',
     lastUpdated: '08:42',
-    rast: '12:15-12:45',
     unreadRemisser: 4,
     staff: [
-      { label: 'Narkos', value: 'Redo', tone: 'ok', detail: '2 av 2 tillgängliga' },
-      { label: 'Sjuksköterska', value: 'Bemannad', tone: 'ok', detail: '3 av 3 tillgängliga' },
-      { label: 'Läkare', value: 'Jour kontaktad', tone: 'warn', detail: '1 väntar bekräftelse' },
-      { label: 'Rast', value: '12:15-12:45', tone: 'ok', detail: 'Buffert kvar 15 min' },
+      { label: 'Narkos', value: 'Redo', tone: 'ok', detail: '2 av 2 tillgÃ¤ngliga' },
+      { label: 'SjukskÃ¶terska', value: 'Bemannad', tone: 'ok', detail: '3 av 3 tillgÃ¤ngliga' },
+      { label: 'LÃ¤kare', value: 'Jour kontaktad', tone: 'warn', detail: '1 vÃ¤ntar bekrÃ¤ftelse' },
     ],
   } satisfies TessaMockData,
 
   notifications: [
-    { id: 'acute-review', title: 'Akut ECT behöver bedömas', detail: '1 ny akut remiss väntar på prioritering.', fullMessage: 'En ny remiss med röd prioritet har registrerats för akut ECT. Remissen behöver medicinsk bedömning och placering i akutflödet innan dagens behandlingsplan kan fastställas.', time: 'För 8 min sedan', route: '/prioritering?status=Pending', urgent: true },
-    { id: 'orbit', title: 'Orbit-underlag saknas', detail: '2 ECT-patienter behöver kompletteras.', fullMessage: 'Två patienter i förmiddagens ECT-block saknar komplett Orbit-underlag. Kontrollera att nödvändiga uppgifter finns registrerade innan patienterna markeras som behandlingsklara.', time: 'För 24 min sedan', route: '/dashboard?module=ect&filter=attention' },
-    { id: 'doctor', title: 'Läkarbekräftelse väntar', detail: 'Bemanningen för förmiddagsblocket är inte klar.', fullMessage: 'Jourläkaren är kontaktad men har ännu inte bekräftat tillgänglighet för förmiddagens behandlingsblock. Bekräftelsen behöver följas upp före första patientens planerade tid.', time: 'För 37 min sedan', route: '/dashboard?module=ect&filter=attention' },
-    { id: 'referral', title: 'Ny remiss registrerad', detail: 'En elektiv ECT-remiss har kommit in.', fullMessage: 'En ny elektiv ECT-remiss har registrerats och väntar på första prioritering. Kontrollera remissuppgifter, önskad behandlingsstart och att kontaktuppgifter till remitterande enhet är kompletta.', time: 'För 52 min sedan', route: '/prioritering?status=Pending' },
+    { id: 'acute-review', title: 'Akut ECT behÃ¶ver bedÃ¶mas', detail: '1 ny akut remiss vÃ¤ntar pÃ¥ prioritering.', fullMessage: 'En ny remiss med rÃ¶d prioritet har registrerats fÃ¶r akut ECT. Remissen behÃ¶ver medicinsk bedÃ¶mning och placering i akutflÃ¶det innan dagens behandlingsplan kan faststÃ¤llas.', time: 'FÃ¶r 8 min sedan', route: '/prioritering?status=Pending', urgent: true },
+    { id: 'orbit', title: 'Orbit-underlag saknas', detail: '2 ECT-patienter behÃ¶ver kompletteras.', fullMessage: 'TvÃ¥ patienter i fÃ¶rmiddagens ECT-block saknar komplett Orbit-underlag. Kontrollera att nÃ¶dvÃ¤ndiga uppgifter finns registrerade innan patienterna markeras som behandlingsklara.', time: 'FÃ¶r 24 min sedan', route: '/dashboard?module=ect&filter=attention' },
+    { id: 'doctor', title: 'LÃ¤karbekrÃ¤ftelse vÃ¤ntar', detail: 'Bemanningen fÃ¶r fÃ¶rmiddagsblocket Ã¤r inte klar.', fullMessage: 'JourlÃ¤karen Ã¤r kontaktad men har Ã¤nnu inte bekrÃ¤ftat tillgÃ¤nglighet fÃ¶r fÃ¶rmiddagens behandlingsblock. BekrÃ¤ftelsen behÃ¶ver fÃ¶ljas upp fÃ¶re fÃ¶rsta patientens planerade tid.', time: 'FÃ¶r 37 min sedan', route: '/dashboard?module=ect&filter=attention' },
+    { id: 'referral', title: 'Ny remiss registrerad', detail: 'En elektiv ECT-remiss har kommit in.', fullMessage: 'En ny elektiv ECT-remiss har registrerats och vÃ¤ntar pÃ¥ fÃ¶rsta prioritering. Kontrollera remissuppgifter, Ã¶nskad behandlingsstart och att kontaktuppgifter till remitterande enhet Ã¤r kompletta.', time: 'FÃ¶r 52 min sedan', route: '/prioritering?status=Pending' },
   ],
 
-  // Modulerna styr de två stora korten på startsidan.
+  // The modules drive the two large cards on the home page.
   modules: [
     {
       id: 'ect',
       title: 'ECT',
-      description: 'Elektrokonvulsiv behandling · Förmiddagsblock 09:00-12:00',
+      description: 'Elektrokonvulsiv behandling Â· FÃ¶rmiddagsblock 09:00-12:00',
       route: '/dashboard?module=ect',
       statusTone: 'warn',
-      capacityLabel: '9 bokade av 12 platser',
+      capacityLabel: '9 bokade av 15 platser',
       operationalAlert: {
-        label: 'Läkare väntar bekräftelse',
-        detail: '1 bemanningsbesked behöver hanteras före behandlingsblocket.',
+        label: 'LÃ¤kare vÃ¤ntar bekrÃ¤ftelse',
+        detail: '1 bemanningsbesked behÃ¶ver hanteras fÃ¶re behandlingsblocket.',
         route: '/dashboard?module=ect&filter=attention',
       },
       statusRows: [
-        // Varje statusrad har en egen route så användaren kan gå direkt till rätt filter.
-        { tone: 'ok', count: 7, label: 'klara för behandling', route: '/dashboard?module=ect&filter=ok' },
-        { tone: 'warn', count: 2, label: 'väntar Orbit', route: '/dashboard?module=ect&filter=attention' },
+        // Each status row has its own route so the user can jump straight to the right filter.
+        { tone: 'ok', count: 7, label: 'klara fÃ¶r behandling', route: '/dashboard?module=ect&filter=ok' },
+        { tone: 'warn', count: 2, label: 'vÃ¤ntar Orbit', route: '/dashboard?module=ect&filter=attention' },
         { tone: 'akut', count: 2, label: 'akuta ECT-fall', route: '/dashboard?module=ect&filter=akut' },
       ],
     },
     {
       id: 'rtms',
       title: 'rTMS',
-      description: 'Repetitiv transkraniell magnetstimulering · Eftermiddag 13:00-',
+      description: 'Repetitiv transkraniell magnetstimulering Â· Eftermiddagsblock 13:00-15:30',
       route: '/rtms?module=rtms',
       statusTone: 'ok',
-      capacityLabel: '7 bokade av 13 platser',
+      capacityLabel: '7 bokade av 15 platser',
       statusRows: [
-        // rTMS-raderna går till rTMS-vyn och skickar med filter i URL:en.
-        { tone: 'ok', count: 6, label: 'klara för behandling', route: '/rtms?module=rtms&filter=ok' },
-        { tone: 'warn', count: 1, label: 'väntar bedömning', route: '/rtms?module=rtms&filter=attention' },
-        { tone: 'akut', count: 0, label: 'akuta ärenden', route: '/rtms?module=rtms&filter=akut' },
+        // The rTMS rows link to the rTMS view and pass the filter in the URL.
+        { tone: 'ok', count: 6, label: 'klara fÃ¶r behandling', route: '/rtms?module=rtms&filter=ok' },
+        { tone: 'warn', count: 1, label: 'vÃ¤ntar bedÃ¶mning', route: '/rtms?module=rtms&filter=attention' },
+        { tone: 'akut', count: 0, label: 'akuta Ã¤renden', route: '/rtms?module=rtms&filter=akut' },
       ],
     },
     {
       id: 'acuteEct',
       title: 'Akut ECT',
-      description: 'Akut elektrokonvulsiv behandling · Prioriterat flöde för omedelbar handläggning',
+      description: 'Akut elektrokonvulsiv behandling Â· Prioriterat flÃ¶de fÃ¶r omedelbar handlÃ¤ggning',
       route: '/dashboard?module=ect&filter=akut',
       statusTone: 'akut',
-      capacityLabel: '2 aktuella akuta ärenden',
+      capacityLabel: '2 aktuella akuta Ã¤renden',
       statusRows: [
-        { tone: 'ok', count: 1, label: 'klar för akut behandling', route: '/dashboard?module=ect&filter=akut&status=ok' },
-        { tone: 'warn', count: 1, label: 'väntar bedömning', route: '/dashboard?module=ect&filter=akut&status=attention' },
-        { tone: 'akut', count: 2, label: 'kräver omedelbar åtgärd', route: '/dashboard?module=ect&filter=akut' },
+        { tone: 'ok', count: 1, label: 'klar fÃ¶r akut behandling', route: '/dashboard?module=ect&filter=akut&status=ok' },
+        { tone: 'warn', count: 1, label: 'vÃ¤ntar bedÃ¶mning', route: '/dashboard?module=ect&filter=akut&status=attention' },
+        { tone: 'akut', count: 2, label: 'krÃ¤ver omedelbar Ã¥tgÃ¤rd', route: '/dashboard?module=ect&filter=akut' },
       ],
     },
   ] satisfies ModuleCardData[],
 
-  // Snabbåtgärderna visas som knappar under modulkorten.
+  // The quick actions are shown as buttons under the module cards.
   quickActions: [
     { label: 'Ny remiss', route: '/bokning', ariaLabel: 'Skapa ny remiss', tone: 'default', icon: Plus },
-    { label: 'Prioriteringslista', route: '/prioritering', ariaLabel: 'Öppna prioriteringslista', tone: 'default', icon: ListChecks },
-    { label: 'Styrdokument', route: '/dokument', ariaLabel: 'Öppna styrdokument', tone: 'default', icon: FileText },
-    { label: 'Statistik & Kvalitet', route: '/statistik', ariaLabel: 'Öppna statistik och kvalitet', tone: 'default', icon: BarChart3 },
+    { label: 'Prioriteringslista', route: '/prioritering', ariaLabel: 'Ã–ppna prioriteringslista', tone: 'default', icon: ListChecks },
   ] satisfies QuickActionData[],
 };
 
-// Kopplar varje status till en ikon från lucide-react.
+// Maps each status to an icon from lucide-react.
 export const statusIconByTone: Record<StatusTone, LucideIcon> = {
   ok: CheckCircle2,
   warn: Clock,
   akut: AlertTriangle,
 };
 
-// Ikonen kan användas när TESSA sammanfattas.
+// The icon can be used when TESSA is summarized.
 export const tessaSummaryIcon = RadioTower;
+
+

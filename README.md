@@ -42,7 +42,7 @@ To run the project, you need:
 - Node.js and npm
 - The project backend running at `http://localhost:5000`
 
-The frontend forwards all `/api` requests to the backend through the Vite proxy configured in `vite.config.ts`.
+The frontend forwards local `/api` requests to the backend through the Vite proxy configured in `vite.config.ts`.
 
 ## Getting Started
 
@@ -229,13 +229,29 @@ npx playwright install
 
 ## Demo Mode
 
-The project supports additional demo data in some booking views. Create a `.env.local` file in the project root and add:
+The project supports additional demo data in some booking views. In development, demo mode is enabled by default unless you set it to `false`.
+
+Create a `.env.local` file in the project root when you want to override local settings:
 
 ```env
 VITE_ENABLE_DEMO_DATA=true
+VITE_DEV_API_PROXY_TARGET=http://localhost:5000
 ```
 
+For production deploys, use:
+
+```env
+VITE_ENABLE_DEMO_DATA=false
+VITE_API_BASE_URL=/api
+```
+
+If the backend is hosted separately, set `VITE_API_BASE_URL` to the backend API base URL instead of `/api`.
+
 Demo mode does not replace authentication or every backend request. The backend is still required for the complete application workflow.
+
+## MVP Scope
+
+The current MVP assessment is documented in [`docs/mvp-audit.md`](docs/mvp-audit.md). In short, the MVP should focus on the core flow: create referral, review/prioritize, book a treatment slot, and show the booked time in the daily schedule.
 
 ## Future Plan
 

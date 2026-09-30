@@ -1,14 +1,16 @@
-// ─── Gemensamma TypeScript-typer ──────────────────────────────────────────────
-// Den här filen beskriver vilken form data har i frontend.
-// DTO betyder "Data Transfer Object" och är objekt som skickas mellan frontend och backend.
+// ─── Shared TypeScript types ──────────────────────────────────────────────────
+// This file describes the shape of data in the frontend.
+// DTO means "Data Transfer Object" — objects sent between frontend and backend.
 
-// Möjliga statusar för en bokning.
+// Possible statuses for a booking.
 export type BookingStatus = 'Pending' | 'Confirmed' | 'Cancelled';
 
-// Möjliga prioriteringsnivåer för en bokning.
+// Possible priority levels for a booking.
 export type BookingPriority = 'Green' | 'Yellow' | 'Red';
+export type AssessmentStatus = 'NotStarted' | 'Incomplete' | 'Complete' | 'NotRequired';
+export type IntegrationStatus = 'Manual' | 'PendingSync' | 'Synced' | 'SyncFailed' | 'ExternalOnly';
 
-// TreatmentType speglar C#-enumen i backend (värden 1–7).
+// TreatmentType mirrors the C# enum in the backend (values 1–7).
 export type TreatmentType = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export const TREATMENT_TYPE_LABELS: Record<TreatmentType, string> = {
@@ -28,7 +30,7 @@ export const TREATMENT_TYPE_OPTIONS = Object.entries(TREATMENT_TYPE_LABELS).map(
 export function isEctType(t: number): boolean { return t >= 1 && t <= 4; }
 export function isRtmsType(t: number): boolean { return t >= 5 && t <= 7; }
 
-// BookingDto är bokningsdata som kommer från backend.
+// BookingDto is booking data coming from the backend.
 export interface BookingDto {
   bookingId: number;
   date: string;
@@ -41,9 +43,17 @@ export interface BookingDto {
   referralDepartment?: string;
   referralContactName?: string;
   referralContactPhone?: string;
+  cancellationReason?: string;
+  healthDeclarationStatus?: AssessmentStatus;
+  anesthesiaAssessmentStatus?: AssessmentStatus;
+  externalPatientId?: string;
+  sourceSystem?: string;
+  careUnitId?: string;
+  regionCode?: string;
+  integrationStatus?: IntegrationStatus;
 }
 
-// CreateBookingDto är datan frontend skickar till backend när en bokning skapas eller uppdateras.
+// CreateBookingDto is the data the frontend sends to the backend when a booking is created or updated.
 export interface CreateBookingDto {
   date: string;
   patientId: number;
@@ -55,82 +65,205 @@ export interface CreateBookingDto {
   referralDepartment?: string;
   referralContactName?: string;
   referralContactPhone?: string;
+  cancellationReason?: string;
+  healthDeclarationStatus?: AssessmentStatus;
+  anesthesiaAssessmentStatus?: AssessmentStatus;
+  externalPatientId?: string;
+  sourceSystem?: string;
+  careUnitId?: string;
+  regionCode?: string;
+  integrationStatus?: IntegrationStatus;
 }
 
-// PatientDto beskriver en patient som kommer från backend.
+// PatientDto describes a patient coming from the backend.
 export interface PatientDto {
   patientId: number;
   fullName: string;
   socialSecurityNumber: string;
+  externalPatientId?: string;
+  sourceSystem?: string;
+  regionCode?: string;
+  integrationStatus?: IntegrationStatus;
 }
 
-// CreatePatientDto används när frontend skapar en ny patient.
+// CreatePatientDto is used when the frontend creates a new patient.
 export interface CreatePatientDto {
   fullName: string;
   socialSecurityNumber: string;
+  externalPatientId?: string;
+  sourceSystem?: string;
+  regionCode?: string;
+  integrationStatus?: IntegrationStatus;
 }
 
-// UserDto beskriver en användare i systemet.
+// UserDto describes a user in the system.
 export interface UserDto {
   userId: number;
   email: string;
   fullname: string;
+  roleId?: number;
   roleName?: string;
+  careUnitId?: string;
 }
 
-// CreateUserDto används när en ny användare skapas.
+// CreateUserDto is used when a new user is created.
 export interface CreateUserDto {
   fullname: string;
   email: string;
   password: string;
   roleId: number;
+  careUnitId?: string;
 }
 
-// UpdateUserDto används när en användare uppdateras.
-// Fälten är optional eftersom man kanske bara ändrar ett av dem.
+// UpdateUserDto is used when a user is updated.
+// The fields are optional since only one of them might be changing.
 export interface UpdateUserDto {
   fullname?: string;
   email?: string;
   password?: string;
+  roleId?: number;
+  careUnitId?: string;
 }
 
-// LoginDto skickas till backend vid inloggning.
+// LoginDto is sent to the backend when logging in.
 export interface LoginDto {
   email: string;
   password: string;
 }
 
-// RoleDto beskriver en roll, till exempel Admin eller Sjuksköterska.
+// RoleDto describes a role, for example Admin or Nurse.
 export interface RoleDto {
   roleId: number;
   roleName: string;
 }
 
-// DocumentDto beskriver ett dokument i systemet.
+// DocumentDto describes a document in the system.
 export interface DocumentDto {
   documentId: number;
   fileName: string;
   verified: boolean;
   uploadedByUserId: number;
+  title?: string;
+  documentType?: string;
+  businessArea?: string;
+  version?: string;
+  owner?: string;
+  validFrom?: string;
+  validTo?: string;
+  externalDocumentId?: string;
+  description?: string;
+  link?: string;
 }
 
-// CreateDocumentDto används när ett dokument skapas.
+// CreateDocumentDto is used when a document is created.
 export interface CreateDocumentDto {
   fileName: string;
   verified: boolean;
   uploadedByUserId: number;
+  title?: string;
+  documentType?: string;
+  businessArea?: string;
+  version?: string;
+  owner?: string;
+  validFrom?: string;
+  validTo?: string;
+  externalDocumentId?: string;
+  description?: string;
+  link?: string;
 }
 
-// NotificationDto beskriver en notis.
+// NotificationDto describes a notification.
 export interface NotificationDto {
   notificationId: number;
   message: string;
-  createdAt: string;
+  sentAt: string;
+  createdAt?: string;
+  recipientId: number;
   isRead: boolean;
 }
 
-// OperationResult är ett generiskt svar från backend.
-// T betyder att data kan vara olika typ beroende på API-anrop.
+export type ReferralStatus =
+  | 'Draft'
+  | 'Submitted'
+  | 'NeedsCompletion'
+  | 'UnderReview'
+  | 'Approved'
+  | 'Scheduled'
+  | 'Paused'
+  | 'Cancelled'
+  | 'Completed'
+  | 'Rejected'
+  | 'NoShow';
+
+export type ReferralActionType = 'CompletionRequested' | 'CompletionSubmitted' | 'Prioritized' | 'TimeConfirmed';
+
+export interface ReferralDto {
+  referralId: number;
+  bookingId?: number;
+  patientId: number;
+  treatmentTypeId: TreatmentType;
+  department: string;
+  contactName?: string;
+  contactPhone?: string;
+  priority: BookingPriority;
+  status: ReferralStatus;
+  requestedStartDate?: string;
+  createdAt: string;
+  updatedAt?: string;
+  externalPatientId?: string;
+  sourceSystem?: string;
+  careUnitId?: string;
+  regionCode?: string;
+  integrationStatus?: IntegrationStatus;
+}
+
+export interface ReferralActionDto {
+  referralActionId: number;
+  referralId: number;
+  actionType: ReferralActionType;
+  title: string;
+  comment: string;
+  priority?: BookingPriority;
+  confirmedDateTime?: string;
+  createdAt: string;
+  createdById?: number;
+}
+
+export interface CreateReferralActionDto {
+  actionType: ReferralActionType;
+  comment: string;
+  priority?: BookingPriority;
+  confirmedDateTime?: string;
+}
+
+export interface ReferralTimelineEventDto {
+  title: string;
+  detail: string;
+  createdAt: string;
+  tone: 'info' | 'warning' | 'success' | 'danger';
+}
+
+export interface IntegrationCapabilityDto {
+  key: string;
+  label: string;
+  status: string;
+  detail: string;
+}
+
+export interface IntegrationReadinessDto {
+  enabled: boolean;
+  regionCode: string;
+  sourceSystem: string;
+  identityProvider: string;
+  journalProvider: string;
+  integrationLayer: string;
+  allowOutboundPatientData: boolean;
+  allowPatientDetailsInExternalNotifications: boolean;
+  capabilities: IntegrationCapabilityDto[];
+}
+
+// OperationResult is a generic response from the backend.
+// T means the data type can vary depending on the API call.
 export interface OperationResult<T> {
   success: boolean;
   data?: T;

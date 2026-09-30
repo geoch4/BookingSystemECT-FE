@@ -1,20 +1,56 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
-import { BarChart2, CalendarDays, FileText, Plus, Settings, Zap } from 'lucide-react';
+import { BarChart3, CalendarCheck, CalendarDays, ClipboardList, FileText, ListChecks, Plus, Settings, Users, Zap } from 'lucide-react';
 import LanguageSwitch from '../common/LanguageSwitch';
 import { useLanguage } from '../../context/LanguageContext';
+import { getAllowedPortalMode, portalLabels } from '../../config/portal';
+import { roleDisplayName, type AppRole, type Permission } from '../../utils/permissions';
 
-const navItems = [
-  { to: '/',           labelKey: 'start' as const,       icon: Zap,          end: true  },
-  { to: '/referral',   labelKey: 'newReferral' as const, icon: Plus,         end: false },
-  { to: '/bookings',   labelKey: 'bookings' as const,    icon: CalendarDays, end: false },
-  { to: '/documents',  labelKey: 'documents' as const,   icon: FileText,     end: false },
-  { to: '/statistik',  labelKey: 'statistics' as const,  icon: BarChart2,    end: false },
+type NavItem = {
+  to: string;
+  labelKey: Parameters<ReturnType<typeof useLanguage>['t']>[0];
+  icon: typeof Zap;
+  end: boolean;
+  permission?: Permission;
+};
+
+const departmentNavItems: NavItem[] = [
+  { to: '/', labelKey: 'start', icon: Zap, end: true },
+  { to: '/ny-remiss', labelKey: 'newReferral', icon: Plus, end: false, permission: 'createReferral' },
+  { to: '/referrals', labelKey: 'referrals', icon: ClipboardList, end: false, permission: 'viewOwnPatients' },
+  { to: '/bekraftade-tider', labelKey: 'bookedTimes', icon: CalendarCheck, end: false, permission: 'viewConfirmedTimes' },
 ];
 
-const adminItems = [
-  { to: '/admin', labelKey: 'administration' as const, icon: Settings, end: false },
+const coordinatorNavItems: NavItem[] = [
+  { to: '/', labelKey: 'start', icon: Zap, end: true },
+  { to: '/remissko', labelKey: 'referralQueue', icon: ClipboardList, end: false, permission: 'viewReferralQueue' },
+  { to: '/dagens-lista', labelKey: 'dailyList', icon: CalendarCheck, end: false, permission: 'viewDailyList' },
+  { to: '/bookings?action=new', labelKey: 'newBooking', icon: Plus, end: false, permission: 'confirmElvisBooking' },
 ];
+
+const doctorNavItems: NavItem[] = [
+  { to: '/', labelKey: 'start', icon: Zap, end: true },
+  { to: '/remissko', labelKey: 'referralsToAssess', icon: ClipboardList, end: false, permission: 'viewReferralQueue' },
+  { to: '/dagens-lista', labelKey: 'dailyList', icon: CalendarCheck, end: false, permission: 'viewDailyList' },
+];
+
+const adminNavItems: NavItem[] = [
+  { to: '/', labelKey: 'start', icon: Zap, end: true },
+  { to: '/dagens-lista', labelKey: 'dailyList', icon: CalendarCheck, end: false, permission: 'viewDailyList' },
+  { to: '/calendar', labelKey: 'calendar', icon: CalendarDays, end: false, permission: 'viewCalendar' },
+  { to: '/documents', labelKey: 'documents', icon: FileText, end: false, permission: 'viewDocuments' },
+  { to: '/statistik', labelKey: 'statistics', icon: BarChart3, end: false, permission: 'viewStatistics' },
+  { to: '/admin/users', labelKey: 'users', icon: Users, end: false, permission: 'manageUsers' },
+  { to: '/admin/audit', labelKey: 'auditLog', icon: ListChecks, end: false, permission: 'viewAuditLog' },
+  { to: '/admin/settings', labelKey: 'settings', icon: Settings, end: false, permission: 'manageSettings' },
+];
+
+function getNavItems(portalMode: 'admin' | 'department', appRole: AppRole | null | undefined) {
+  if (portalMode === 'department') return departmentNavItems;
+  if (appRole === 'admin') return adminNavItems;
+  if (appRole === 'medical-responsible') return doctorNavItems;
+  return coordinatorNavItems;
+}
 
 function initials(name?: string) {
   if (!name) return '?';
@@ -22,33 +58,37 @@ function initials(name?: string) {
 }
 
 export default function Sidebar() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, hasPermission, appRole } = useAuth();
   const { t } = useLanguage();
+  const portalMode = getAllowedPortalMode(user?.role);
+  const baseNavItems = getNavItems(portalMode, appRole);
+  const navItems = baseNavItems.filter((item) => !item.permission || hasPermission(item.permission));
+  const portal = portalLabels[portalMode];
 
   return (
     <aside aria-label="Sidopanel" style={{
       width: 220, flexShrink: 0,
-      background: '#172033', color: '#fff',
+      background: 'linear-gradient(180deg, #1F2937 0%, #111827 58%, #0F172A 100%)', color: '#fff',
       display: 'flex', flexDirection: 'column',
       position: 'fixed', top: 0, bottom: 0, left: 0,
       height: '100dvh', zIndex: 30,
-      boxShadow: '2px 0 10px rgba(23, 32, 51, 0.08)',
+      boxShadow: '8px 0 28px rgba(17, 24, 39, 0.16)',
     }}>
       <div style={{ padding: '20px 20px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8494AA' }}>
-          Psykiatri Affektiva
+          {portal.eyebrow}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginTop: 10 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 9,
-            background: 'var(--ect-color)', color: '#fff',
+            background: 'linear-gradient(135deg, var(--ect-color), var(--rtms-color))', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <Zap size={20} strokeWidth={2.5} />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 750, color: '#fff', lineHeight: 1.1 }}>ECT / rTMS</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#8494AA' }}>Sahlgrenska</div>
+            <div style={{ fontSize: 15, fontWeight: 750, color: '#fff', lineHeight: 1.1 }}>{portal.title}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#8494AA' }}>{portal.subtitle}</div>
           </div>
         </div>
       </div>
@@ -63,9 +103,10 @@ export default function Sidebar() {
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '10px 12px', borderRadius: 9,
               fontSize: 13.5, fontWeight: 600, textDecoration: 'none',
-              background: isActive ? 'var(--ect-bg)' : 'transparent',
-              color: isActive ? '#0F5C9F' : '#C4CEDB',
-              transition: 'background 0.14s, color 0.14s',
+              background: isActive ? 'rgba(255,255,255,0.13)' : 'transparent',
+              color: isActive ? '#FFFFFF' : '#C4CEDB',
+              boxShadow: isActive ? 'inset 3px 0 0 var(--ect-color)' : 'inset 3px 0 0 transparent',
+              transition: 'background 0.14s, color 0.14s, box-shadow 0.14s',
             })}
           >
             <item.icon size={18} />
@@ -73,31 +114,6 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        {isAdmin && (
-          <>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5C6B82', padding: '16px 10px 7px' }}>
-              Admin
-            </div>
-            {adminItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                style={({ isActive }) => ({
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 12px', borderRadius: 9,
-                  fontSize: 13.5, fontWeight: 600, textDecoration: 'none',
-                  background: isActive ? 'var(--ect-bg)' : 'transparent',
-                  color: isActive ? '#0F5C9F' : '#C4CEDB',
-                  transition: 'background 0.14s, color 0.14s',
-                })}
-              >
-                <item.icon size={18} />
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
-          </>
-        )}
       </nav>
 
       <div style={{ padding: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
@@ -105,7 +121,7 @@ export default function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 999,
-            background: 'var(--ect-color)', color: '#fff',
+            background: 'linear-gradient(135deg, var(--ect-color), var(--rtms-color))', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 12.5, fontWeight: 800, flexShrink: 0,
           }}>
@@ -116,7 +132,7 @@ export default function Sidebar() {
               {user?.name}
             </div>
             <div style={{ fontSize: 11, color: '#7A8797', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.role || user?.email}
+              {user?.role ? roleDisplayName(user.role) : user?.email}
             </div>
           </div>
         </div>

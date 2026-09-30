@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUsers, deleteUser } from '../api/users';
+import { getUsers, updateUser, deleteUser } from '../api/users';
 import { getRoles, createRole, updateRole, deleteRole } from '../api/roles';
 import { register } from '../api/auth';
-import type { UserDto, RoleDto, CreateUserDto } from '../types';
+import type { UserDto, RoleDto, CreateUserDto, UpdateUserDto } from '../types';
 import { TREATMENT_TYPE_LABELS } from '../types';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import BackendErrorState from '../components/common/BackendErrorState';
@@ -14,6 +15,7 @@ type Tab = 'treatments' | 'users' | 'roles';
 
 // ─── Shared modal primitives ──────────────────────────────────────────────────
 
+// Generic centered modal shell shared by the user and role forms below.
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -28,6 +30,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+// Generic error banner shown when a create/update mutation fails.
 function ErrorMsg() {
   return (
     <div className="text-sm text-[#C42B2B] bg-[#FDEAEA] px-3 py-2 rounded-lg">
@@ -36,6 +39,7 @@ function ErrorMsg() {
   );
 }
 
+// Shared cancel/submit button row for the modal forms below.
 function ModalButtons({ onClose, isPending, isEdit }: { onClose: () => void; isPending: boolean; isEdit: boolean }) {
   return (
     <div className="flex gap-3 pt-2">
@@ -51,6 +55,7 @@ function ModalButtons({ onClose, isPending, isEdit }: { onClose: () => void; isP
   );
 }
 
+// Shared tab header: title, item count, and an "add new" button.
 function SectionHeader({ title, count, onAdd }: { title: string; count: number; onAdd: () => void }) {
   return (
     <div className="flex items-center justify-between mb-4">
@@ -68,6 +73,7 @@ function SectionHeader({ title, count, onAdd }: { title: string; count: number; 
 
 // ─── Treatment Types ──────────────────────────────────────────────────────────
 
+// Read-only list of treatment types — these are a fixed backend enum, not editable data.
 function TreatmentsTab() {
   const entries = Object.entries(TREATMENT_TYPE_LABELS) as [string, string][];
 
@@ -105,23 +111,57 @@ function TreatmentsTab() {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-function UserModal({ onClose }: { onClose: () => void }) {
+function getInitialRoleId(user: UserDto | undefined, roles: RoleDto[]) {
+  if (!user) return 0;
+  if (user.roleId) return user.roleId;
+  return roles.find((role) => role.roleName === user.roleName)?.roleId ?? 0;
+}
+
+// Creates or edits a user account. New users go through auth/register; existing users use User API.
+function UserModal({ existing, onClose }: { existing?: UserDto; onClose: () => void }) {
   const qc = useQueryClient();
   const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: getRoles });
-  const [form, setForm] = useState<CreateUserDto>({ fullname: '', email: '', password: '', roleId: 0 });
+  const isEdit = !!existing;
+  const [form, setForm] = useState<CreateUserDto>({
+    fullname: existing?.fullname ?? '',
+    email: existing?.email ?? '',
+    password: '',
+    roleId: getInitialRoleId(existing, roles),
+    careUnitId: existing?.careUnitId ?? '',
+  });
 
-  const mutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: register,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); onClose(); },
+  });
+  const updateMutation = useMutation({
+    mutationFn: (dto: UpdateUserDto) => updateUser(existing!.userId, dto),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); onClose(); },
   });
 
   function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    mutation.mutate(form);
+    const selectedRoleId = form.roleId || getInitialRoleId(existing, roles);
+    if (isEdit) {
+      updateMutation.mutate({
+        fullname: form.fullname,
+        email: form.email,
+        roleId: selectedRoleId || undefined,
+        careUnitId: form.careUnitId?.trim() || undefined,
+        password: form.password.trim() ? form.password : undefined,
+      });
+      return;
+    }
+
+    createMutation.mutate(form);
   }
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isError = createMutation.isError || updateMutation.isError;
+  const selectedRoleId = form.roleId || getInitialRoleId(existing, roles);
+
   return (
-    <Modal title="Registrera användare" onClose={onClose}>
+    <Modal title={isEdit ? 'Redigera användare' : 'Registrera användare'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-[#4B5770] mb-1">Namn</label>
@@ -136,30 +176,40 @@ function UserModal({ onClose }: { onClose: () => void }) {
             className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#4B5770] mb-1">Lösenord</label>
-          <input type="password" required minLength={6} value={form.password}
+          <label className="block text-sm font-medium text-[#4B5770] mb-1">
+            Lösenord {isEdit && <span className="font-normal text-[#8494AA]">(lämna tomt för oförändrat)</span>}
+          </label>
+          <input type="password" required={!isEdit} minLength={form.password ? 6 : undefined} value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]" />
         </div>
         <div>
           <label className="block text-sm font-medium text-[#4B5770] mb-1">Roll</label>
-          <select required value={form.roleId || ''}
+          <select required value={selectedRoleId || ''}
             onChange={(e) => setForm((f) => ({ ...f, roleId: Number(e.target.value) }))}
             className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]">
             <option value="">Välj roll...</option>
             {roles.map((r) => <option key={r.roleId} value={r.roleId}>{r.roleName}</option>)}
           </select>
         </div>
-        {mutation.isError && <ErrorMsg />}
-        <ModalButtons onClose={onClose} isPending={mutation.isPending} isEdit={false} />
+        <div>
+          <label className="block text-sm font-medium text-[#4B5770] mb-1">Vårdenhet / avdelning</label>
+          <input type="text" value={form.careUnitId ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, careUnitId: e.target.value }))}
+            placeholder="Ex. Avdelning 361"
+            className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]" />
+        </div>
+        {isError && <ErrorMsg />}
+        <ModalButtons onClose={onClose} isPending={isPending} isEdit={isEdit} />
       </form>
     </Modal>
   );
 }
 
+// Lists all users with a delete action; new users are created via UserModal.
 function UsersTab() {
   const qc = useQueryClient();
-  const [showModal, setShowModal] = useState(false);
+  const [modal, setModal] = useState<{ open: boolean; user?: UserDto }>({ open: false });
   const [confirmDialog, setConfirmDialog] = useState<{ userId: number; name: string } | null>(null);
   const { data: users = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['users'], queryFn: getUsers });
   const deleteMutation = useMutation({
@@ -169,7 +219,7 @@ function UsersTab() {
 
   return (
     <div>
-      <SectionHeader title="Användare" count={isError ? 0 : users.length} onAdd={() => setShowModal(true)} />
+      <SectionHeader title="Användare" count={isError ? 0 : users.length} onAdd={() => setModal({ open: true })} />
       {isError && (
         <div className="mb-4">
           <BackendErrorState error={error} onRetry={() => void refetch()} />
@@ -180,7 +230,7 @@ function UsersTab() {
           <table className="w-full">
             <thead><tr className="text-left text-xs font-medium text-[#8494AA] uppercase tracking-wider border-b border-[#DDE3EC]">
               <th scope="col" className="px-4 py-3">ID</th><th scope="col" className="px-4 py-3">Namn</th>
-              <th scope="col" className="px-4 py-3">E-post</th><th scope="col" className="px-4 py-3">Roll</th><th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
+              <th scope="col" className="px-4 py-3">E-post</th><th scope="col" className="px-4 py-3">Roll</th><th scope="col" className="px-4 py-3">Vårdenhet</th><th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
             </tr></thead>
             <tbody>
               {users.map((u: UserDto) => (
@@ -193,9 +243,14 @@ function UsersTab() {
                       {u.roleName ?? '–'}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-sm text-[#4B5770]">{u.careUnitId || '–'}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => setConfirmDialog({ userId: u.userId, name: u.fullname })}
-                      className="text-xs text-[#C42B2B] hover:underline">Radera</button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setModal({ open: true, user: u })}
+                        className="text-xs text-[#1A4F8A] hover:underline">Redigera</button>
+                      <button onClick={() => setConfirmDialog({ userId: u.userId, name: u.fullname })}
+                        className="text-xs text-[#C42B2B] hover:underline">Radera</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -203,7 +258,7 @@ function UsersTab() {
           </table>
         )}
       </div>
-      {showModal && <UserModal onClose={() => setShowModal(false)} />}
+      {modal.open && <UserModal existing={modal.user} onClose={() => setModal({ open: false })} />}
       {confirmDialog && (
         <ConfirmDialog
           title="Radera användare"
@@ -219,6 +274,7 @@ function UsersTab() {
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 
+// Creates or renames a role, depending on whether `existing` is passed in.
 function RoleModal({ existing, onClose }: { existing?: RoleDto; onClose: () => void }) {
   const qc = useQueryClient();
   const isEdit = !!existing;
@@ -255,6 +311,7 @@ function RoleModal({ existing, onClose }: { existing?: RoleDto; onClose: () => v
   );
 }
 
+// Lists all roles with edit/delete actions; new roles are created via RoleModal.
 function RolesTab() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; item?: RoleDto }>({ open: false });
@@ -313,6 +370,7 @@ function RolesTab() {
 
 // ─── Tiny shared table helpers ────────────────────────────────────────────────
 
+// Centered spinner shown while a tab's data is loading.
 function LoadingRow() {
   return (
     <div className="flex items-center justify-center gap-3 p-8 text-sm text-[#8494AA]">
@@ -320,6 +378,7 @@ function LoadingRow() {
     </div>
   );
 }
+// Wraps EmptyState for the tab tables so each tab can pass its own empty-state message.
 function EmptyRow({ text }: { text: string }) {
   return <EmptyState title={text} />;
 }
@@ -333,7 +392,19 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>('treatments');
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const initialTab: Tab = location.pathname.endsWith('/users')
+    ? 'users'
+    : location.pathname.endsWith('/settings')
+      ? 'roles'
+      : searchParams.get('tab') === 'users'
+        ? 'users'
+        : searchParams.get('tab') === 'roles'
+          ? 'roles'
+          : 'treatments';
+  // Which of the three tabs (treatments/users/roles) is currently shown.
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">

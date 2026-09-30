@@ -5,6 +5,7 @@ import type { BookingReferralMeta } from '../../utils/bookingMeta';
 import { addHistoryEntry } from '../../utils/bookingHistory';
 import CancelBookingDialog from '../common/CancelBookingDialog';
 import { useLanguage } from '../../context/LanguageContext';
+import { getRtmsSessionPlan, rtmsSessionPlanShortLabel } from '../../utils/rtmsTreatmentPlan';
 
 export interface Slot {
   time: string;
@@ -14,7 +15,7 @@ export interface Slot {
   treatmentTypeName?: string;
 }
 
-export function slotStatus(b?: BookingDto): { label: string; bg: string; text: string; border: string } {
+function slotStatus(b?: BookingDto): { label: string; bg: string; text: string; border: string } {
   if (!b || b.status === 'Cancelled') return { label: 'Ledig', bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', border: 'border-[#D1D5DB]' };
   if (b.priority === 'Red')    return { label: 'AKUT',           bg: 'bg-[#FCEBEC]', text: 'text-[#B4232A]', border: 'border-[#B4232A]' };
   if (b.priority === 'Yellow') return { label: 'Åtgärd behövs', bg: 'bg-[#FFF3D8]', text: 'text-[#875100]', border: 'border-[#C77A06]' };
@@ -24,16 +25,17 @@ export function slotStatus(b?: BookingDto): { label: string; bg: string; text: s
 
 interface SlotRowProps {
   slot: Slot;
-  isBreak?: boolean;
-  onStatusChange: (b: BookingDto, status: BookingStatus, priority: BookingPriority) => void;
+  showAnesthesia?: boolean;
+  onStatusChange: (b: BookingDto, status: BookingStatus, priority: BookingPriority, cancellationReason?: string) => void;
   referralMeta?: BookingReferralMeta;
 }
 
-export default function SlotRow({ slot, isBreak, onStatusChange, referralMeta }: SlotRowProps) {
+export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, referralMeta }: SlotRowProps) {
   const { t } = useLanguage();
   const [pendingCancel, setPendingCancel] = useState(false);
   const b = slot.booking;
   const cfg = slotStatus(b);
+  const rtmsPlan = b ? getRtmsSessionPlan(b) : null;
 
   const visibleStatus = !b || b.status === 'Cancelled'
     ? t('free')
@@ -66,31 +68,17 @@ export default function SlotRow({ slot, isBreak, onStatusChange, referralMeta }:
         toPriority: b.priority,
         cancellationReason: reason || undefined,
       });
-      onStatusChange(b, 'Cancelled', b.priority);
+      onStatusChange(b, 'Cancelled', b.priority, reason || undefined);
     }
-  }
-
-  if (isBreak) {
-    return (
-      <tr className="border-b border-[#DDE3EC]">
-        <td className="px-3 py-2 text-sm font-mono font-semibold text-[#8494AA]">{slot.time}</td>
-        <td colSpan={6} className="px-3 py-2">
-          <div className="flex items-center gap-2 text-xs text-[#8494AA] italic">
-            <span className="w-2 h-2 rounded-full bg-[#8494AA] inline-block" />
-            Rast
-          </div>
-        </td>
-      </tr>
-    );
   }
 
   return (
     <tr className={`border-b border-[#DDE3EC] hover:bg-[#F8FAFC] transition-colors ${cfg.bg}`}>
-      <td className="px-3 py-2 text-sm font-mono font-semibold text-[#4B5770] whitespace-nowrap">{slot.time}</td>
+      <td className="px-2.5 py-2 text-sm font-mono font-semibold text-[#4B5770] whitespace-nowrap">{slot.time}</td>
 
       {b && b.status !== 'Cancelled' ? (
         <>
-          <td className="px-2 py-2">
+          <td className="px-2.5 py-2">
             <div className="text-sm font-medium text-[#1A2332] leading-tight">{slot.patient?.fullName ?? `#${b.patientId}`}</div>
             <div className="text-xs text-[#8494AA] font-mono">{slot.patient?.socialSecurityNumber ?? '–'}</div>
             <div className="text-xs text-[#4B5770] mt-0.5">
@@ -102,22 +90,37 @@ export default function SlotRow({ slot, isBreak, onStatusChange, referralMeta }:
               </div>
             )}
           </td>
-          <td className="px-3 py-2 text-sm text-[#4B5770]">{slot.treatmentTypeName ?? '–'}</td>
-
-          <td className="px-3 py-2 text-center">
-            <span className="text-xs font-semibold text-[#526174]">{t('notReady')}</span>
+          <td className="px-2.5 py-2 text-sm text-[#4B5770]">
+            <div>{slot.treatmentTypeName ?? '–'}</div>
+            {rtmsPlan && (
+              <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+                rtmsPlan === 'double'
+                  ? 'border-[#C4B5FD] bg-[#F7F4FF] text-[#4F46E5]'
+                  : 'border-[#A7D8CE] bg-[#F2FAF8] text-[#0F766E]'
+              }`}>
+                rTMS {rtmsSessionPlanShortLabel(rtmsPlan)}
+              </span>
+            )}
           </td>
-          <td className="px-3 py-2 text-center">
-            <span className="text-xs font-semibold text-[#526174]">{t('notReady')}</span>
-          </td>
 
-          <td className="px-3 py-2">
+          <td className="px-2.5 py-2 text-center">
+            <span className="text-xs font-semibold text-[#526174]">
+              {rtmsPlan ? 'Kontroll' : t('notReady')}
+            </span>
+          </td>
+          {showAnesthesia && (
+            <td className="px-2.5 py-2 text-center">
+              <span className="text-xs font-semibold text-[#526174]">{t('notReady')}</span>
+            </td>
+          )}
+
+          <td className="px-2.5 py-2">
             <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
               {visibleStatus}
             </span>
           </td>
 
-          <td className="px-2 py-2">
+          <td className="px-2.5 py-2">
             <div className="flex flex-col gap-1.5">
               <div className="relative">
                 <select
@@ -127,7 +130,7 @@ export default function SlotRow({ slot, isBreak, onStatusChange, referralMeta }:
                     const [status, priority] = e.target.value.split(':') as [BookingStatus, BookingPriority];
                     handleDropdownChange(status, priority);
                   }}
-                  className="h-8 w-full appearance-none rounded-md border border-[#8FB4D8] bg-[#EAF4FC] pl-2.5 pr-7 text-xs font-semibold text-[#185FA5] shadow-sm transition-all hover:border-[#185FA5] hover:bg-[#DCECF9] focus:outline-none focus:ring-3 focus:ring-[#185FA5]/20"
+                  className="h-8 w-full appearance-none rounded-md border border-[#8FB4D8] bg-[#EAF4FC] pl-2 pr-7 text-xs font-semibold text-[#185FA5] shadow-sm transition-all hover:border-[#185FA5] hover:bg-[#DCECF9] focus:outline-none focus:ring-3 focus:ring-[#185FA5]/20"
                 >
                   <option value="Pending:Green">{t('waiting')} · {t('green')}</option>
                   <option value="Pending:Yellow">{t('waiting')} · {t('yellow')}</option>
@@ -142,7 +145,7 @@ export default function SlotRow({ slot, isBreak, onStatusChange, referralMeta }:
                 type="button"
                 aria-label={`Avboka ${slot.patient?.fullName ?? `patient ${b.patientId}`} klockan ${slot.time}`}
                 onClick={() => setPendingCancel(true)}
-                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-[#E5A3A6] bg-[#FFF7F7] px-2.5 text-xs font-semibold text-[#B4232A] shadow-sm transition-all hover:border-[#B4232A] hover:bg-[#FCEBEC] active:shadow-none focus:outline-none focus:ring-3 focus:ring-[#B4232A]/20"
+                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-[#E5A3A6] bg-[#FFF7F7] px-2 text-xs font-semibold text-[#B4232A] shadow-sm transition-all hover:border-[#B4232A] hover:bg-[#FCEBEC] active:shadow-none focus:outline-none focus:ring-3 focus:ring-[#B4232A]/20"
               >
                 <X size={14} strokeWidth={2.25} aria-hidden="true" />
                 {t('cancel')}
@@ -160,8 +163,8 @@ export default function SlotRow({ slot, isBreak, onStatusChange, referralMeta }:
         </>
       ) : (
         <>
-          <td colSpan={5} className="px-3 py-2 text-sm text-[#8494AA] italic">{t('free')}</td>
-          <td className="px-3 py-2" />
+          <td colSpan={showAnesthesia ? 5 : 4} className="px-2.5 py-2 text-sm text-[#8494AA] italic">{t('free')}</td>
+          <td className="px-2.5 py-2" />
         </>
       )}
     </tr>

@@ -2,9 +2,10 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 
 export default function AdminRoute() {
-  const { isAdmin } = useAuth();
+  const { token, user, hasAnyPermission } = useAuth();
 
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!token || !user) return <Navigate to="/login" replace />;
+  if (!hasAnyPermission(['manageUsers', 'manageSettings'])) return <Navigate to="/" replace />;
 
   return <Outlet />;
 }

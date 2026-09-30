@@ -1,7 +1,8 @@
 const STEPS = [
   { n: 1, label: 'Patient' },
   { n: 2, label: 'Behandling & prioritet' },
-  { n: 3, label: 'Hälsodeklaration' },
+  { n: 3, label: 'Klinisk information' },
+  { n: 4, label: 'Granska & skicka' },
 ];
 
 export default function StepBar({ current }: { current: number }) {

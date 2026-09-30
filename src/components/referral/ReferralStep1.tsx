@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getPatients } from '../../api/patients';
 import type { FormState } from './referralTypes';
+import { validatePersonnummer } from '../../utils/personnummer';
 
 interface Props {
   form: FormState;
@@ -19,19 +20,31 @@ export default function ReferralStep1({ form, setForm, onNext }: Props) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const normalizedSearch = searchPnr.trim().toLowerCase();
+  const searchDigits = searchPnr.replace(/\D/g, '');
+  const newPatientPnrValidation = validatePersonnummer(form.newPatientPnr);
   const matchingPatients = patients
     .filter((p) =>
       !normalizedSearch
-      || p.socialSecurityNumber.includes(normalizedSearch)
+      || p.socialSecurityNumber.toLowerCase().includes(normalizedSearch)
+      || p.socialSecurityNumber.replace(/\D/g, '').includes(searchDigits)
       || p.fullName.toLowerCase().includes(normalizedSearch)
     )
     .slice(0, 6);
 
-  const canProceed = Boolean(form.patient ?? (form.newPatientName.trim() && form.newPatientPnr.trim()));
+  const canProceed = Boolean(form.patient ?? (form.newPatientName.trim() && newPatientPnrValidation.isValid));
 
   function handleNewPatientKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== 'Enter' || !canProceed) return;
     event.preventDefault();
+    handleNext();
+  }
+
+  function handleNext() {
+    if (mode === 'new') {
+      const validation = validatePersonnummer(form.newPatientPnr);
+      if (!validation.isValid) return;
+      setForm({ ...form, newPatientPnr: validation.normalized });
+    }
     onNext();
   }
 
@@ -77,6 +90,9 @@ export default function ReferralStep1({ form, setForm, onNext }: Props) {
               placeholder="YYYYMMDDXXXX eller efternamn..."
               className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A] font-mono"
             />
+            <p className="mt-1 text-xs text-[#8494AA]">
+              Du kan skriva med eller utan bindestreck, t.ex. 198001011234 eller 800101-1234.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -108,9 +124,21 @@ export default function ReferralStep1({ form, setForm, onNext }: Props) {
           </div>
 
           {form.patient && (
-            <div className="flex items-center gap-2 text-sm text-[#1A9E5F] bg-[#E8F7F1] px-3 py-2 rounded-lg">
-              <span>✓</span>
-              <span>Vald: <strong>{form.patient.fullName}</strong></span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-[#1A9E5F] bg-[#E8F7F1] px-3 py-2 rounded-lg">
+                <span>✓</span>
+                <span>Vald: <strong>{form.patient.fullName}</strong></span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#4B5770] mb-1">Extern patientreferens</label>
+                <input
+                  type="text"
+                  value={form.externalPatientId || form.patient.externalPatientId || ''}
+                  onChange={(e) => setForm({ ...form, externalPatientId: e.target.value })}
+                  placeholder="Valfri lokal/journalnära referens"
+                  className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -133,9 +161,37 @@ export default function ReferralStep1({ form, setForm, onNext }: Props) {
               type="text"
               value={form.newPatientPnr}
               onChange={(e) => setForm({ ...form, newPatientPnr: e.target.value })}
+              onBlur={() => {
+                const validation = validatePersonnummer(form.newPatientPnr);
+                if (validation.normalized) setForm({ ...form, newPatientPnr: validation.normalized });
+              }}
               onKeyDown={handleNewPatientKeyDown}
               placeholder="YYYYMMDDXXXX"
-              className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A] font-mono"
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 font-mono ${
+                form.newPatientPnr && !newPatientPnrValidation.isValid
+                  ? 'border-[#C42B2B] focus:ring-[#C42B2B]'
+                  : 'border-[#DDE3EC] focus:ring-[#1A4F8A]'
+              }`}
+            />
+            {form.newPatientPnr && !newPatientPnrValidation.isValid && (
+              <p className="mt-1 text-xs font-medium text-[#C42B2B]">
+                {newPatientPnrValidation.message}
+              </p>
+            )}
+            {newPatientPnrValidation.isValid && (
+              <p className="mt-1 text-xs font-medium text-[#1A9E5F]">
+                Personnummer är giltigt.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#4B5770] mb-1">Extern patientreferens</label>
+            <input
+              type="text"
+              value={form.externalPatientId}
+              onChange={(e) => setForm({ ...form, externalPatientId: e.target.value })}
+              placeholder="Valfri lokal/journalnära referens"
+              className="w-full px-3 py-2 border border-[#DDE3EC] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]"
             />
           </div>
         </div>
@@ -143,7 +199,7 @@ export default function ReferralStep1({ form, setForm, onNext }: Props) {
 
       <div className="mt-6 flex justify-end">
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canProceed}
           className="px-6 py-2 bg-[#1A4F8A] text-white rounded-lg text-sm font-medium hover:bg-[#1a3f6f] transition-colors disabled:opacity-40"
         >

@@ -1,45 +1,45 @@
 import type { BookingDto } from '../types';
 
-// Metadata för remissen som backend ännu inte sparar i BookingDto.
-// Den används för att visa vilken avdelning/enhet som har bokat patienten.
+// Metadata for the referral that the backend doesn't yet store in BookingDto.
+// Used to show which department/unit booked the patient.
 export interface BookingReferralMeta {
   department: string;
   contactName: string;
   contactPhone: string;
 }
 
-// Nyckeln där metadata sparas i webbläsarens localStorage.
+// The key under which metadata is stored in the browser's localStorage.
 const STORAGE_KEY = 'bookingReferralMeta';
 
-// Objekt där varje bookingId pekar på sin remissmetadata.
+// Object where each bookingId points to its referral metadata.
 type BookingMetaMap = Record<number, BookingReferralMeta>;
 
-// Läser all metadata från localStorage.
-// try/catch gör att appen inte kraschar om lagringen är tom eller trasig.
+// Reads all metadata from localStorage.
+// try/catch keeps the app from crashing if storage is empty or corrupted.
 function readMetaMap(): BookingMetaMap {
   try {
-    // Hämtar JSON-strängen från localStorage.
+    // Get the JSON string from localStorage.
     const raw = localStorage.getItem(STORAGE_KEY);
 
-    // Om det finns data parsas den, annars returneras ett tomt objekt.
+    // If data exists, parse it; otherwise return an empty object.
     return raw ? JSON.parse(raw) : {};
   } catch {
-    // Fallback om JSON inte går att läsa.
+    // Fallback if the JSON can't be read.
     return {};
   }
 }
 
-// Skriver hela metadata-objektet tillbaka till localStorage.
+// Writes the whole metadata object back to localStorage.
 function writeMetaMap(map: BookingMetaMap) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }
 
-// Hämtar metadata för en specifik bokning.
+// Fetches metadata for a specific booking.
 export function getBookingReferralMeta(bookingId: number): BookingReferralMeta | undefined {
   return readMetaMap()[bookingId];
 }
 
-// Hämtar all metadata så dashboard och bokningslista kan slå upp flera bokningar.
+// Fetches all metadata so the dashboard and booking list can look up several bookings.
 export function getAllBookingReferralMeta(): BookingMetaMap {
   return readMetaMap();
 }
@@ -61,19 +61,19 @@ export function getReferralMetaForBooking(
   };
 }
 
-// Sparar eller uppdaterar metadata för en bokning.
+// Saves or updates metadata for a booking.
 export function saveBookingReferralMeta(bookingId: number, meta: BookingReferralMeta) {
-  // Läs befintliga metadata först så vi inte skriver över andra bokningar.
+  // Read the existing metadata first so we don't overwrite other bookings.
   const map = readMetaMap();
 
-  // Koppla metadata till rätt bookingId.
+  // Attach the metadata to the right bookingId.
   map[bookingId] = meta;
 
-  // Spara tillbaka hela objektet.
+  // Save the whole object back.
   writeMetaMap(map);
 }
 
-// Tar bort metadata när en bokning tas bort.
+// Removes metadata when a booking is deleted.
 export function deleteBookingReferralMeta(bookingId: number) {
   const map = readMetaMap();
   delete map[bookingId];

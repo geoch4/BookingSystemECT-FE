@@ -97,12 +97,6 @@ const styles: Record<string, CSSProperties> = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   },
   calmNote: { fontSize: 12, color: '#526174', fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6 },
-  bookBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    borderRadius: 'var(--radius-sm)', padding: '5px 10px',
-    fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-    transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
-  },
   openBtn: {
     marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
     borderRadius: 'var(--radius-sm)', padding: '8px 13px', fontSize: 13, fontWeight: 750,
@@ -152,10 +146,16 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
       style={{
         ...styles.card,
         background: module.id === 'ect'
-          ? hovered ? '#DCECF9' : '#EAF3FB'
+          ? hovered
+            ? 'linear-gradient(135deg, #F7F4FF 0%, #EEF2FF 100%)'
+            : 'linear-gradient(135deg, #FFFCF7 0%, #F7F4FF 100%)'
           : module.id === 'rtms'
-            ? hovered ? '#DCEFE8' : '#E8F5F0'
-            : hovered ? '#F9DCDE' : '#FCEBEC',
+            ? hovered
+              ? 'linear-gradient(135deg, #F2FAF8 0%, #E6F4F1 100%)'
+              : 'linear-gradient(135deg, #FFFCF7 0%, #F2FAF8 100%)'
+            : hovered
+              ? 'linear-gradient(135deg, #FFF7F7 0%, #FCEBEC 100%)'
+              : 'linear-gradient(135deg, #FFFCF7 0%, #FFF7F7 100%)',
         border: akutCount > 0 ? '1px solid rgba(180,35,42,0.45)' : `1px solid ${visual.border}`,
         borderTop: `3px solid ${visual.color}`,
         transform: hovered ? 'translateY(-4px)' : 'none',
@@ -259,16 +259,6 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
           <span style={styles.calmNote}>
             <Check size={14} style={{ color: 'var(--ok-color)' }} aria-hidden="true" /> Inga akuta
           </span>
-        )}
-
-        {available > 0 && hovered && (
-          <button
-            type="button"
-            style={{ ...styles.bookBtn, background: visual.bg, color: visual.color, border: `1px solid ${visual.border}` }}
-            onClick={(e) => { e.stopPropagation(); onOpen(`${module.route}&action=book`); }}
-          >
-            <Plus size={13} aria-hidden="true" /> Boka tid
-          </button>
         )}
 
         <span

@@ -40,7 +40,7 @@ export default function TessaBar({ data }: TessaBarProps) {
       <span style={styles.sectionLabel}>Bemanning idag</span>
       <div style={styles.staffGroup}>
         {data.staff.map((s) => {
-          const showValue = s.tone !== 'ok' || s.label === 'Rast';
+          const showValue = s.tone !== 'ok';
           return (
             <span key={s.label} style={styles.pill}>
               <span style={{ ...styles.dot, background: toneColor[s.tone] ?? 'var(--border-strong)' }} />

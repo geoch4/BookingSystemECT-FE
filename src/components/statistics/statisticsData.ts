@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react';
+import type { BookingDto } from '../../types';
+import { isEctType, isRtmsType } from '../../types';
 
 export type ModuleFilter = 'all' | 'ect' | 'rtms';
 export type Tone = 'ect' | 'rtms' | 'ok' | 'warn' | 'akut';
@@ -114,4 +116,93 @@ export function filterLabel(filter: ModuleFilter) {
 export function completionPercent(completed: number, total: number) {
   if (total === 0) return 0;
   return Math.round((completed / total) * 100);
+}
+
+function countByModule(bookings: BookingDto[], predicate: (booking: BookingDto) => boolean) {
+  const matching = bookings.filter(predicate);
+  return {
+    ect: matching.filter((booking) => isEctType(booking.treatmentTypeId)).length,
+    rtms: matching.filter((booking) => isRtmsType(booking.treatmentTypeId)).length,
+    all: matching.length,
+  };
+}
+
+function averageWaitingDays(bookings: BookingDto[]) {
+  const confirmed = bookings.filter((booking) => booking.status === 'Confirmed');
+  if (confirmed.length === 0) return 0;
+
+  const totalDays = confirmed.reduce((sum, booking) => {
+    const created = new Date(booking.createdAt).getTime();
+    const scheduled = new Date(booking.date).getTime();
+    if (!Number.isFinite(created) || !Number.isFinite(scheduled)) return sum;
+    return sum + Math.max(0, Math.round((scheduled - created) / (1000 * 60 * 60 * 24)));
+  }, 0);
+
+  return Math.round(totalDays / confirmed.length);
+}
+
+export function buildMetricsFromBookings(bookings: BookingDto[]): Metric[] {
+  const active = bookings.filter((booking) => booking.status !== 'Cancelled');
+  const confirmed = countByModule(active, (booking) => booking.status === 'Confirmed');
+  const acute = active.filter((booking) => booking.priority === 'Red').length;
+  const waitingDays = averageWaitingDays(active);
+
+  return [
+    { module: 'ect',  label: 'ECT bekräftade',  value: String(confirmed.ect),  detail: 'bokningar från backend', trend: 'Live från bokningsdata', trendGood: true, tone: 'ect' },
+    { module: 'rtms', label: 'rTMS bekräftade', value: String(confirmed.rtms), detail: 'bokningar från backend', trend: 'Live från bokningsdata', trendGood: true, tone: 'rtms' },
+    { module: 'all',  label: 'Medelväntetid',   value: `${waitingDays} dagar`, detail: 'skapad till bokad tid',   trend: active.length ? 'Beräknad från bokningar' : 'Inga bokningar ännu', trendGood: true, tone: 'ok' },
+    { module: 'all',  label: 'Akuta ärenden',   value: String(acute),          detail: 'röd prioritet',           trend: acute > 0 ? 'Kräver bevakning' : 'Inga akuta ärenden', trendGood: acute === 0, tone: 'akut' },
+  ];
+}
+
+export function buildImprovementsFromBookings(bookings: BookingDto[]): Improvement[] {
+  const active = bookings.filter((booking) => booking.status !== 'Cancelled');
+  const missingHealth = active.filter((booking) => booking.healthDeclarationStatus !== 'Complete').length;
+  const missingAnesthesia = active.filter((booking) => booking.anesthesiaAssessmentStatus === 'Incomplete' || booking.anesthesiaAssessmentStatus === 'NotStarted').length;
+  const cancelledWithoutReason = bookings.filter((booking) => booking.status === 'Cancelled' && !booking.cancellationReason).length;
+
+  return [
+    {
+      module: 'ect',
+      title: 'Hälsodeklaration saknas',
+      count: missingHealth,
+      impact: 'Bokningar utan komplett hälsodeklaration behöver kompletteras före behandling.',
+      nextStep: 'Följ upp remisser där hälsodeklarationen inte är markerad komplett.',
+      owner: 'Avdelning',
+      tone: missingHealth > 0 ? 'warn' : 'ok',
+    },
+    {
+      module: 'ect',
+      title: 'Anestesiunderlag saknas',
+      count: missingAnesthesia,
+      impact: 'ECT-flödet riskerar försening när anestesiunderlag inte är komplett.',
+      nextStep: 'Prioritera patienter med röd prioritet och ofullständigt anestesiunderlag.',
+      owner: 'Narkos',
+      tone: missingAnesthesia > 0 ? 'akut' : 'ok',
+    },
+    {
+      module: 'all',
+      title: 'Otydlig orsak till avbokning',
+      count: cancelledWithoutReason,
+      impact: 'Svårt att se om bortfall beror på patient, kapacitet eller förberedelser.',
+      nextStep: 'Registrera avbokningsorsak när en tid avbokas.',
+      owner: 'System',
+      tone: cancelledWithoutReason > 0 ? 'warn' : 'ok',
+    },
+  ];
+}
+
+export function buildRegistryFromBookings(bookings: BookingDto[]): RegistryItem[] {
+  const active = bookings.filter((booking) => booking.status !== 'Cancelled');
+  const ect = active.filter((booking) => isEctType(booking.treatmentTypeId));
+  const rtms = active.filter((booking) => isRtmsType(booking.treatmentTypeId));
+  const completeHealth = active.filter((booking) => booking.healthDeclarationStatus === 'Complete').length;
+  const incomplete = active.length - completeHealth;
+
+  return [
+    { module: 'ect',  label: 'ECT registrerade behandlingar',  completed: ect.filter((booking) => booking.status === 'Confirmed').length, total: ect.length,  status: `${ect.length} ECT-bokningar`,  tone: ect.length ? 'warn' : 'ok' },
+    { module: 'rtms', label: 'rTMS registrerade behandlingar', completed: rtms.filter((booking) => booking.status === 'Confirmed').length, total: rtms.length, status: `${rtms.length} rTMS-bokningar`, tone: 'ok' },
+    { module: 'all',  label: 'Kompletta hälsounderlag',        completed: completeHealth, total: active.length, status: `${incomplete} kvar att komplettera`, tone: incomplete > 0 ? 'warn' : 'ok' },
+    { module: 'all',  label: 'Ofullständig kvalitetsdata',     completed: incomplete, total: active.length || 1, status: incomplete > 0 ? 'Kräver åtgärd' : 'Ingen lucka hittad', tone: incomplete > 0 ? 'akut' : 'ok' },
+  ];
 }

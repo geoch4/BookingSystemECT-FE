@@ -1,4 +1,5 @@
 import { useLanguage } from '../../context/LanguageContext';
+import type { BookingDto, PatientDto } from '../../types';
 
 const STANDBY_MOCK = [
   { id: 1, name: 'Andersson, Britta', ward: 'Avd 361', urgency: 'hög' as const },
@@ -12,16 +13,45 @@ const URGENCY_STYLE: Record<string, string> = {
   låg: 'bg-[#F3F4F6] text-[#6B7280]',
 };
 
-export default function StandbyList() {
+interface StandbyListProps {
+  bookings?: BookingDto[];
+  patientMap?: Record<number, PatientDto>;
+}
+
+function urgencyFromBooking(booking: BookingDto): 'hög' | 'medel' | 'låg' {
+  if (booking.priority === 'Red') return 'hög';
+  if (booking.priority === 'Yellow') return 'medel';
+  return 'låg';
+}
+
+export default function StandbyList({ bookings = [], patientMap = {} }: StandbyListProps) {
   const { t } = useLanguage();
+  const liveItems = bookings
+    .filter((booking) => booking.status === 'Pending')
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((booking) => {
+      const patient = patientMap[booking.patientId];
+      return {
+        id: booking.bookingId,
+        name: patient?.fullName ?? `Patient #${booking.patientId}`,
+        ward: booking.referralDepartment ?? 'Avdelning saknas',
+        urgency: urgencyFromBooking(booking),
+      };
+    });
+  const items = liveItems.length > 0 ? liveItems : STANDBY_MOCK;
+  const usingLiveItems = liveItems.length > 0;
+
   return (
     <div className="bg-white rounded-xl border border-[#DDE3EC]">
       <div className="px-3 py-2.5 border-b border-[#DDE3EC]">
         <h2 className="font-semibold text-[#1A2332]">{t('standbyList')}</h2>
-        <p className="text-xs text-[#8494AA] mt-0.5">{STANDBY_MOCK.length} {t('patientsWaiting')}</p>
+        <p className="text-xs text-[#8494AA] mt-0.5">
+          {items.length} {t('patientsWaiting')}
+          {!usingLiveItems && <span className="ml-1 text-[#185FA5]">(exempel)</span>}
+        </p>
       </div>
       <div className="divide-y divide-[#DDE3EC]">
-        {STANDBY_MOCK.map((p) => (
+        {items.map((p) => (
           <div key={p.id} className="px-3 py-2.5 flex items-center justify-between hover:bg-[#F8FAFC]">
             <div>
               <div className="text-sm font-medium text-[#1A2332]">{p.name}</div>

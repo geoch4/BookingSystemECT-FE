@@ -6,8 +6,53 @@ import { getRoles } from '../api/roles';
 import { useQuery } from '@tanstack/react-query';
 import LanguageSwitch from '../components/common/LanguageSwitch';
 import { useLanguage } from '../context/LanguageContext';
+import { DEMO_MODE } from '../config/demo';
 
 type Mode = 'login' | 'register';
+
+const demoUsers = [
+  {
+    email: 'admin@test.se',
+    password: 'Admin123!',
+    name: 'Test Admin',
+    role: 'admin',
+  },
+  {
+    email: 'avdelning@test.se',
+    password: 'Avdelning123!',
+    name: 'Avdelning Test',
+    role: 'Avdelning',
+  },
+  {
+    email: 'behandling@test.se',
+    password: 'Behandling123!',
+    name: 'Behandlingsenhet Test',
+    role: 'Behandlingsenhet',
+  },
+  {
+    email: 'lakare@test.se',
+    password: 'Lakare123!',
+    name: 'Medicinskt ansvarig Test',
+    role: 'Medicinskt ansvarig',
+  },
+];
+
+function toBase64Url(value: string) {
+  return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function createDemoToken(user: { email: string; name: string; role: string }) {
+  const header = toBase64Url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+  const payload = toBase64Url(JSON.stringify({
+    sub: user.email,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12,
+  }));
+
+  return `${header}.${payload}.demo`;
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -34,16 +79,31 @@ export default function LoginPage() {
     enabled: mode === 'register',
   });
 
+  // Switches between the login and register forms, clearing any leftover error.
   function switchMode(m: Mode) {
     setMode(m);
     setError('');
   }
 
+  // Logs the user in and redirects to the home page on success.
   async function handleLogin(e: { preventDefault(): void }) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
+      if (DEMO_MODE) {
+        const demoUser = demoUsers.find((user) => (
+          user.email.toLowerCase() === email.trim().toLowerCase()
+          && user.password === password
+        ));
+
+        if (demoUser) {
+          login(createDemoToken(demoUser));
+          navigate('/');
+          return;
+        }
+      }
+
       const result = await apiLogin({ email, password });
       if (result.success && result.data) {
         login(result.data);
@@ -51,13 +111,15 @@ export default function LoginPage() {
       } else {
         setError(result.errorMessage ?? 'Fel e-post eller lösenord.');
       }
-    } catch {
-      setError('Kunde inte ansluta till servern.');
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { errorMessage?: string } } })?.response?.data?.errorMessage;
+      setError(errorMessage ?? 'Kunde inte ansluta till servern.');
     } finally {
       setLoading(false);
     }
   }
 
+  // Registers a new account (admin-only) then logs the new user in automatically.
   async function handleRegister(e: { preventDefault(): void }) {
     e.preventDefault();
     setError('');
@@ -160,6 +222,26 @@ export default function LoginPage() {
             >
               {loading ? t('signingIn') : t('signIn')}
             </button>
+            {DEMO_MODE && (
+              <div className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-3">
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Testkonton</div>
+                <div className="mt-2 grid grid-cols-1 gap-2">
+                  {demoUsers.map((user) => (
+                    <button
+                      key={user.email}
+                      type="button"
+                      onClick={() => {
+                        setEmail(user.email);
+                        setPassword(user.password);
+                      }}
+                      className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-left text-xs font-semibold text-[#4B5770] hover:border-[#1A4F8A] hover:text-[#1A4F8A]"
+                    >
+                      {user.role}: {user.email}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </form>
         ) : (
           <form onSubmit={handleRegister} className="space-y-4">
