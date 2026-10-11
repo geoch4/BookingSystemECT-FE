@@ -1,6 +1,7 @@
 import {
   confirmReferralTime,
   getReferralActions,
+  recordReferralPatientAction,
   prioritizeReferral,
   requestReferralCompletion,
   submitReferralCompletion,
@@ -49,6 +50,9 @@ function localTypeForApiAction(actionType: ReferralActionDto['actionType'] | num
   if (actionType === 'CompletionSubmitted' || actionType === 1) return 'completion';
   if (actionType === 'Prioritized' || actionType === 2) return 'prioritize';
   if (actionType === 'TimeConfirmed' || actionType === 3) return 'prioritize';
+  if (actionType === 'PatientPaused' || actionType === 4) return 'pause';
+  if (actionType === 'PatientCancelled' || actionType === 5) return 'cancel';
+  if (actionType === 'PatientEnded' || actionType === 6) return 'end';
   return 'completion';
 }
 
@@ -107,6 +111,19 @@ export async function persistReferralAction(referralId: string, note: ReferralAc
       actionType: 'Prioritized',
       comment: note.comment,
       priority: note.priority,
+    }, { auditReason: note.comment });
+  }
+
+  if (note.type === 'pause' || note.type === 'cancel' || note.type === 'end') {
+    const actionType = note.type === 'pause'
+      ? 'PatientPaused'
+      : note.type === 'cancel'
+        ? 'PatientCancelled'
+        : 'PatientEnded';
+
+    await recordReferralPatientAction(referralId, {
+      actionType,
+      comment: note.comment,
     }, { auditReason: note.comment });
   }
 }

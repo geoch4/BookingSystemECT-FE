@@ -66,6 +66,7 @@ const styles: Record<string, CSSProperties> = {
   },
   rolePanel: {
     marginTop: 18,
+    marginBottom: 20,
     border: '1px solid var(--border)',
     borderRadius: 16,
     background: 'linear-gradient(135deg, #FFFFFF 0%, #F6FAFF 55%, #F7FBF8 100%)',
@@ -103,6 +104,13 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
     transition: 'transform 0.14s, box-shadow 0.14s, border-color 0.14s',
   },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: 850,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--text-muted)',
+  },
 };
 
 // ─── Role-based landing view ──────────────────────────────────────────────────
@@ -133,8 +141,10 @@ function getRoleView(role?: string, appRole?: AppRole | null): RoleView {
       actionNames: [],
       moduleIds: [],
       focusActions: [
+        { label: 'Remisskö', detail: 'Se inkomna ärenden och rolltesta behandlingsflödet', route: '/remissko' },
+        { label: 'Dagens lista', detail: 'Kontrollera aktuell behandlingsdag och utskrift', route: '/dagens-lista' },
         { label: 'Användare', detail: 'Hantera konton och roller', route: '/admin/users' },
-        { label: 'Inställningar', detail: 'Justera roller och grunddata', route: '/admin/settings' },
+        { label: 'Spårbarhet', detail: 'Granska loggar inför produktion', route: '/admin/audit' },
       ],
     };
   }
@@ -272,6 +282,37 @@ function DepartmentLandingPage() {
         </p>
       </section>
 
+      <section style={styles.rolePanel} aria-label="Avdelningens huvuduppgifter">
+        <div style={styles.roleHeader}>
+          <div>
+            <div style={styles.roleEyebrow}>Avdelning</div>
+            <h2 style={{ ...styles.title, fontSize: 20, marginTop: 4 }}>Vad behöver du göra?</h2>
+          </div>
+          <p style={{ ...styles.body, margin: 0, maxWidth: 520 }}>
+            Börja med remissen, följ skickade ärenden separat och se bekräftade tider när behandlingsenheten har bokat.
+          </p>
+        </div>
+        <div style={styles.focusGrid}>
+          {[
+            { label: 'Förbered ny remiss', detail: 'Skapa ECT- eller rTMS-remiss steg för steg', route: '/ny-remiss' },
+            { label: 'Mina remisser', detail: 'Utkast, skickade remisser och ärenden som behöver kompletteras', route: '/referrals' },
+            { label: 'Bekräftade tider', detail: 'Patienter där behandlingsenheten har bekräftat datum och tid', route: '/bekraftade-tider' },
+          ].map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              style={styles.focusButton}
+              onClick={() => navigate(action.route)}
+            >
+              <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800 }}>{action.label}</span>
+              <span style={{ display: 'block', marginTop: 3, fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                {action.detail}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {bookingsQuery.isError && !DEMO_MODE && (
         <BackendErrorState
           error={bookingsQuery.error}
@@ -293,6 +334,7 @@ function DepartmentLandingPage() {
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 }}>
             <div>
+              <div style={styles.sectionLabel}>Behandlingsspår</div>
               <h2 style={{ ...styles.title, fontSize: 22 }}>Behandlingsöversikt</h2>
               <p style={{ ...styles.body, marginTop: 4 }}>
                 Välj ECT eller rTMS för att se rätt behandlingsblock och åtgärder för just den behandlingen.

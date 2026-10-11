@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ClipboardList } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getBookings } from '../api/bookings';
 import { getPatients } from '../api/patients';
+import { updateReferralDepartmentPriority } from '../api/referrals';
 import BackendErrorState from '../components/common/BackendErrorState';
 import ReferralTimeline from '../components/referral/ReferralTimeline';
 import Spinner from '../components/common/Spinner';
@@ -21,6 +22,9 @@ import { getDepartmentReferralSnapshot } from '../repositories/referralRepositor
 import { isEctType } from '../types';
 import { rtmsSessionPlanLabel } from '../utils/rtmsTreatmentPlan';
 import { useAuth } from '../context/useAuth';
+import { maskPersonnummer } from '../utils/personnummer';
+
+type DepartmentReferralTab = 'active' | 'completion' | 'transport' | 'cancelled' | 'all';
 
 function statusBadge(status: string, priority: string) {
   if (status === 'Cancelled') return 'border-[#E5A3A6] bg-[#FDEAEA] text-[#9F1D1D]';
@@ -53,18 +57,37 @@ function actionNoteBadge(type: string) {
 
 export default function DepartmentReferralsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
+  const canCreateReferral = hasPermission('createReferral');
   const canSetDepartmentPriority = hasPermission('setDepartmentPriority');
-  const [actionNotesByReferralId, setActionNotesByReferralId] = useState(getReferralActionSnapshot);
-  const [departmentPriorities, setDepartmentPriorities] = useState(getAllDepartmentPriorities);
+  const canRecordPatientAction = hasPermission('recordPatientAction');
+  const [activeTab, setActiveTab] = useState<DepartmentReferralTab>('active');
+  const [openReferralId, setOpenReferralId] = useState<string | null>(null);
+  const [actionNotesByReferralId, setActionNotesByReferralId] = useState<ReturnType<typeof getReferralActionSnapshot>>(
+    () => DEMO_MODE ? getReferralActionSnapshot() : {},
+  );
+  const [departmentPriorities, setDepartmentPriorities] = useState(
+    () => DEMO_MODE ? getAllDepartmentPriorities() : {},
+  );
   const [activeCompletion, setActiveCompletion] = useState<{ referralId: string; patientName: string } | null>(null);
   const [completionComment, setCompletionComment] = useState('');
+  const departmentPriorityMutation = useMutation({
+    mutationFn: ({ referralId, priority }: { referralId: string; priority?: number }) =>
+      updateReferralDepartmentPriority(referralId, priority, {
+        auditReason: priority ? `Avdelningsprioritet satt till ${priority}.` : 'Avdelningsprioritet borttagen.',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['referrals'] });
+    },
+  });
   const bookingsQuery = useQuery({ queryKey: ['bookings'], queryFn: getBookings });
   const patientsQuery = useQuery({ queryKey: ['patients'], queryFn: getPatients });
   const bookings = DEMO_MODE ? [...(bookingsQuery.data ?? []), ...getDemoBookings()] : bookingsQuery.data ?? [];
   const patients = patientsQuery.data ?? [];
   const patientMap = Object.fromEntries(patients.map((patient) => [patient.patientId, patient]));
-  const referralMetaByBookingId = getAllBookingReferralMeta();
+  const referralMetaByBookingId = getAllBookingReferralMeta(DEMO_MODE);
   const backendUnavailable = !DEMO_MODE && (bookingsQuery.isError || patientsQuery.isError);
   const isLoading = !DEMO_MODE && (bookingsQuery.isLoading || patientsQuery.isLoading);
   const referrals = getDepartmentReferralSnapshot({ bookings, patientMap, referralMetaByBookingId });
@@ -75,12 +98,39 @@ export default function DepartmentReferralsPage() {
     enabled: !DEMO_MODE && referralIds.length > 0,
   });
   const effectiveActionNotesByReferralId = DEMO_MODE ? actionNotesByReferralId : actionSnapshotsQuery.data?.noteMap ?? {};
+  const tabCounts = {
+    active: referrals.filter((referral) => referral.booking.status !== 'Cancelled').length,
+    completion: referrals.filter((referral) => {
+      const note = effectiveActionNotesByReferralId[referral.id];
+      return note?.type === 'completion' && !note.responseComment;
+    }).length,
+    transport: referrals.filter((referral) => referral.logistics.requiresTransport).length,
+    cancelled: referrals.filter((referral) => referral.booking.status === 'Cancelled').length,
+    all: referrals.length,
+  };
+  const visibleReferrals = referrals.filter((referral) => {
+    if (activeTab === 'completion') {
+      const note = effectiveActionNotesByReferralId[referral.id];
+      return note?.type === 'completion' && !note.responseComment;
+    }
+    if (activeTab === 'transport') return referral.logistics.requiresTransport;
+    if (activeTab === 'cancelled') return referral.booking.status === 'Cancelled';
+    if (activeTab === 'active') return referral.booking.status !== 'Cancelled';
+    return true;
+  });
 
-  function updateDepartmentPriority(bookingId: number, priority?: number) {
-    setDepartmentPriorities(saveDepartmentPriority(bookingId, priority));
+  function updateDepartmentPriority(referralId: string, bookingId: number, priority?: number) {
+    if (DEMO_MODE) {
+      setDepartmentPriorities(saveDepartmentPriority(bookingId, priority));
+      return;
+    }
+
+    departmentPriorityMutation.mutate({ referralId, priority });
   }
 
   function openCompletionResponse(referralId: string, patientName: string) {
+    if (!canRecordPatientAction) return;
+
     setActiveCompletion({ referralId, patientName });
     setCompletionComment('');
   }
@@ -91,7 +141,8 @@ export default function DepartmentReferralsPage() {
   }
 
   function submitCompletionResponse() {
-    if (!activeCompletion || !completionComment.trim()) return;
+    if (!activeCompletion || !completionComment.trim() || !canRecordPatientAction) return;
+
     void persistReferralCompletionResponse(activeCompletion.referralId, completionComment.trim())
       .then(() => void actionSnapshotsQuery.refetch())
       .catch(() => {
@@ -111,13 +162,15 @@ export default function DepartmentReferralsPage() {
             Här ser avdelningen aktuella ECT/rTMS-patienter, remisser, intern ECT-prioritet och bekräftade nästa steg.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/referral')}
-          className="rounded-lg bg-[#185FA5] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#185FA5]/20 hover:bg-[#124F8A]"
-        >
-          + Förbered ny remiss
-        </button>
+        {canCreateReferral && (
+          <button
+            type="button"
+            onClick={() => navigate('/referral')}
+            className="rounded-lg bg-[#185FA5] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[#185FA5]/20 hover:bg-[#124F8A]"
+          >
+            + Förbered ny remiss
+          </button>
+        )}
       </div>
 
       {backendUnavailable && (
@@ -136,37 +189,107 @@ export default function DepartmentReferralsPage() {
 
       {!backendUnavailable && !isLoading && (
         <section className="rounded-2xl border border-[#DDE3EC] bg-white p-4 shadow-sm">
+          <div className="mb-4 flex flex-wrap gap-2 border-b border-[#E5EAF1] pb-4">
+            {([
+              { key: 'active', label: 'Aktiva', count: tabCounts.active },
+              { key: 'completion', label: 'Behöver kompletteras', count: tabCounts.completion },
+              { key: 'transport', label: 'Transport', count: tabCounts.transport },
+              { key: 'cancelled', label: 'Avbokade', count: tabCounts.cancelled },
+              { key: 'all', label: 'Alla', count: tabCounts.all },
+            ] as const).map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.key);
+                  setOpenReferralId(null);
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-[#185FA5] bg-[#EFF6FF] text-[#185FA5]'
+                    : 'border-[#DDE3EC] bg-white text-[#4B5770] hover:bg-[#F8FAFC]'
+                }`}
+              >
+                {tab.label} <span className="ml-1 opacity-75">{tab.count}</span>
+              </button>
+            ))}
+          </div>
+
           {referrals.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[#C3CEDA] bg-[#F8FAFC] px-4 py-10 text-center">
               <ClipboardList className="mx-auto text-[#8494AA]" size={30} />
               <div className="mt-3 text-sm font-bold text-[#1A2332]">Inga remisser väntar just nu</div>
               <p className="mt-1 text-sm text-[#8494AA]">Skapa en ny remiss när en patient behöver ECT eller rTMS.</p>
             </div>
+          ) : visibleReferrals.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[#C3CEDA] bg-[#F8FAFC] px-4 py-10 text-center">
+              <ClipboardList className="mx-auto text-[#8494AA]" size={30} />
+              <div className="mt-3 text-sm font-bold text-[#1A2332]">Inga ärenden i den här vyn</div>
+              <p className="mt-1 text-sm text-[#8494AA]">Byt flik för att se andra remisser.</p>
+            </div>
           ) : (
             <div className="space-y-3">
-              {referrals.map((referral) => {
+              {visibleReferrals.map((referral) => {
                 const { booking, patient } = referral;
                 const referralId = referral.id;
                 const actionNote = effectiveActionNotesByReferralId[referralId];
                 const patientName = patient.fullName;
+                const isOpen = openReferralId === referralId;
+                const departmentPriorityValue = DEMO_MODE
+                  ? departmentPriorities[booking.bookingId]
+                  : referral.departmentPriority;
 
                 return (
-                  <article key={booking.bookingId} className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4">
+                  <article key={booking.bookingId} className={`rounded-xl border bg-white shadow-sm transition-colors ${
+                    isOpen ? 'border-[#185FA5] ring-2 ring-[#185FA5]/10' : 'border-[#DDE3EC]'
+                  }`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <Link
-                          to={`/referrals/${referralId}`}
-                          className="text-base font-bold text-[#1A2332] hover:text-[#185FA5] hover:underline"
-                        >
-                          {patientName}
-                        </Link>
-                        <div className="mt-0.5 text-xs font-mono text-[#8494AA]">{patient.socialSecurityNumber}</div>
+                      <div className="min-w-0 p-4 pb-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`/referrals/${referralId}`}
+                            className="text-base font-bold text-[#1A2332] hover:text-[#185FA5] hover:underline"
+                          >
+                            {patientName}
+                          </Link>
+                          {actionNote?.type === 'completion' && !actionNote.responseComment && (
+                            <span className="rounded-full border border-[#E6C77A] bg-[#FFF7E5] px-2.5 py-1 text-xs font-bold text-[#875100]">
+                              Behöver kompletteras
+                            </span>
+                          )}
+                          {referral.logistics.requiresTransport && (
+                            <span className="rounded-full border border-[#DDE3EC] bg-[#F8FAFC] px-2.5 py-1 text-xs font-bold text-[#4B5770]">
+                              Transport
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#64748B]">
+                          <span className="font-mono">{maskPersonnummer(patient.socialSecurityNumber)}</span>
+                          <span>{referral.treatmentLabel}</span>
+                          <span>Skickad {formatSentAt(booking.createdAt)}</span>
+                          {departmentPriorityValue ? (
+                            <span className="font-semibold text-[#185FA5]">
+                              Avd prio {departmentPriorityValue}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusBadge(booking.status, booking.priority)}`}>
-                        {statusLabel(booking.status, booking.priority)}
-                      </span>
+                      <div className="flex items-center gap-2 p-4 pb-3">
+                        <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusBadge(booking.status, booking.priority)}`}>
+                          {statusLabel(booking.status, booking.priority)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setOpenReferralId((current) => current === referralId ? null : referralId)}
+                          className="rounded-lg border border-[#C9D6E6] bg-white px-3 py-1.5 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
+                        >
+                          {isOpen ? 'Stäng' : 'Visa detaljer'}
+                        </button>
+                      </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+
+                    {isOpen && <div className="border-t border-[#E5EAF1] bg-[#F8FAFC] p-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                       <div>
                         <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Skickad</div>
                         <div className="mt-1 text-sm font-semibold text-[#1A2332]">{formatSentAt(booking.createdAt)}</div>
@@ -212,12 +335,13 @@ export default function DepartmentReferralsPage() {
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {[1, 2, 3].map((priority) => {
-                              const isSelected = departmentPriorities[booking.bookingId] === priority;
+                              const isSelected = departmentPriorityValue === priority;
                               return (
                                 <button
                                   key={priority}
                                   type="button"
-                                  onClick={() => updateDepartmentPriority(booking.bookingId, priority)}
+                                  onClick={() => updateDepartmentPriority(referral.id, booking.bookingId, priority)}
+                                  disabled={departmentPriorityMutation.isPending}
                                   className={`rounded-lg border px-3 py-2 text-xs font-bold transition-all ${
                                     isSelected
                                       ? 'border-[#4F46E5] bg-[#F7F4FF] text-[#4F46E5] shadow-sm'
@@ -230,7 +354,8 @@ export default function DepartmentReferralsPage() {
                             })}
                             <button
                               type="button"
-                              onClick={() => updateDepartmentPriority(booking.bookingId)}
+                              onClick={() => updateDepartmentPriority(referral.id, booking.bookingId)}
+                              disabled={departmentPriorityMutation.isPending}
                               className="rounded-lg border border-[#E3D8CB] bg-white px-3 py-2 text-xs font-bold text-[#64748B] hover:border-[#CBBBA8] hover:bg-[#FBF7F0]"
                             >
                               Ingen
@@ -270,7 +395,7 @@ export default function DepartmentReferralsPage() {
                             )}
                           </div>
                         )}
-                        {actionNote.type === 'completion' && !actionNote.responseComment && (
+                        {actionNote.type === 'completion' && !actionNote.responseComment && canRecordPatientAction && (
                           <button
                             type="button"
                             onClick={() => openCompletionResponse(referralId, patientName)}
@@ -282,6 +407,7 @@ export default function DepartmentReferralsPage() {
                       </div>
                     )}
                     <ReferralTimeline booking={booking} note={actionNote} />
+                    </div>}
                   </article>
                 );
               })}

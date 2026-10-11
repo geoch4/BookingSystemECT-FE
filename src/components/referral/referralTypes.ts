@@ -1,4 +1,5 @@
 import type { BookingPriority, PatientDto, TreatmentType } from '../../types';
+import type { RtmsSessionPlan } from '../../utils/rtmsTreatmentPlan';
 
 export interface HealthDeclaration {
   fastaOk: boolean | null;
@@ -22,6 +23,7 @@ export interface EctReferralDetails {
 }
 
 export interface RtmsReferralDetails {
+  sessionPlan: RtmsSessionPlan | null;
   indication: string;
   previousTreatments: string;
   contraindicationChecklistComplete: boolean | null;
@@ -49,6 +51,7 @@ export interface FormState {
   preferredTime: string;
   // These fields let the coordinator see which department sent the referral.
   department: string;
+  treatmentUnitId: string;
   contactName: string;
   contactPhone: string;
   // Step 3
@@ -67,6 +70,7 @@ export const EMPTY_FORM: FormState = {
   preferredDate: '',
   preferredTime: '',
   department: '',
+  treatmentUnitId: '',
   contactName: '',
   contactPhone: '',
   health: {
@@ -89,6 +93,7 @@ export const EMPTY_FORM: FormState = {
     },
   },
   rtms: {
+    sessionPlan: null,
     indication: '',
     previousTreatments: '',
     contraindicationChecklistComplete: null,

@@ -17,8 +17,11 @@ import StandbyList from '../components/dashboard/StandbyList';
 import { useQuickUpdate } from '../hooks/useQuickUpdate';
 import { useLanguage } from '../context/LanguageContext';
 import { DEMO_MODE } from '../config/demo';
-import { getPortalMode } from '../config/portal';
+import { getAllowedPortalMode } from '../config/portal';
 import type { Slot } from '../components/dashboard/SlotRow';
+import { maskPersonnummer } from '../utils/personnummer';
+import { useAuth } from '../context/useAuth';
+import { getReferralLogistics } from '../utils/careLogistics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -115,6 +118,87 @@ function fallbackPatient(patientId: number): PatientDto {
     fullName: names[Math.abs(patientId) % names.length] ?? `Patient #${patientId}`,
     socialSecurityNumber: `${String(1970 + (patientId % 30)).padStart(4, '0')}${String((patientId % 12) + 1).padStart(2, '0')}${String((patientId % 27) + 1).padStart(2, '0')}-${String(1000 + patientId).slice(-4)}`,
   };
+}
+
+function AdminDaySummary({
+  bookings,
+  moduleView,
+  onNavigate,
+}: {
+  bookings: BookingDto[];
+  moduleView: ModuleView;
+  onNavigate: (route: string) => void;
+}) {
+  const ectBookings = bookings.filter((booking) => isEctType(booking.treatmentTypeId) && booking.status !== 'Cancelled');
+  const rtmsBookings = bookings.filter((booking) => isRtmsType(booking.treatmentTypeId) && booking.status !== 'Cancelled');
+  const activeBookings = bookings.filter((booking) => booking.status !== 'Cancelled');
+  const pending = activeBookings.filter((booking) => booking.status === 'Pending').length;
+  const confirmed = activeBookings.filter((booking) => booking.status === 'Confirmed').length;
+  const transport = activeBookings.filter((booking) => (
+    getReferralLogistics(booking.referralDepartment || '', booking.treatmentTypeId).requiresTransport
+  )).length;
+  const ectCapacity = ECT_TIMES.length;
+  const rtmsCapacity = RTMS_TIMES.length;
+  const totalCapacity =
+    moduleView === 'ect' ? ectCapacity :
+    moduleView === 'rtms' ? rtmsCapacity :
+    ectCapacity + rtmsCapacity;
+  const booked =
+    moduleView === 'ect' ? ectBookings.length :
+    moduleView === 'rtms' ? rtmsBookings.length :
+    activeBookings.length;
+  const available = Math.max(totalCapacity - booked, 0);
+
+  return (
+    <section className="mb-5 rounded-2xl border border-[#DDE3EC] bg-white p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-[#1A2332]">Dagens överblick</h2>
+          <p className="mt-1 text-sm text-[#8494AA]">
+            Snabb kontroll av beläggning, väntande ärenden och logistik för vald vy.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate('/remissko')}
+            className="rounded-lg border border-[#C9D6E6] bg-white px-3 py-2 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
+          >
+            Remisskö
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('/calendar')}
+            className="rounded-lg border border-[#C9D6E6] bg-white px-3 py-2 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
+          >
+            Kalender
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {[
+          ['Bokade', booked, 'Aktiva tider i vald vy'],
+          ['Lediga', available, 'Lediga slots i blocket'],
+          ['Bekräftade', confirmed, 'Tider bekräftade'],
+          ['Väntar', pending, 'Väntar prioritering/beslut'],
+          ['Transport', transport, 'Behöver transportplan'],
+        ].map(([label, value, description]) => (
+          <div key={label} className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-3">
+            <div className="text-2xl font-black text-[#1A2332]">{value}</div>
+            <div className="mt-1 text-xs font-bold uppercase tracking-wide text-[#4B5770]">{label}</div>
+            <div className="mt-1 text-xs text-[#8494AA]">{description}</div>
+          </div>
+        ))}
+      </div>
+
+      {booked === 0 && (
+        <div className="mt-4 rounded-xl border border-dashed border-[#C3CEDA] bg-[#F8FAFC] px-4 py-4 text-sm text-[#64748B]">
+          Det finns inga bokade patienter i vald vy för datumet. Kontrollera remisskön, byt datum eller öppna kalendern för överblick.
+        </div>
+      )}
+    </section>
+  );
 }
 
 function priorityRank(priority: BookingPriority) {
@@ -360,7 +444,7 @@ function DepartmentReferralList({
                             {patient?.fullName ?? `Patient #${booking.patientId}`}
                           </div>
                           <div className="mt-0.5 text-xs font-mono text-[#8494AA]">
-                            {patient?.socialSecurityNumber ?? 'Personnummer saknas'}
+                            {maskPersonnummer(patient?.socialSecurityNumber)}
                           </div>
                         </div>
                       </div>
@@ -421,7 +505,7 @@ function DepartmentReferralList({
                           {patient?.fullName ?? `Patient #${booking.patientId}`}
                         </div>
                         <div className="mt-0.5 text-xs font-mono text-[#4B7B66]">
-                          {patient?.socialSecurityNumber ?? 'Personnummer saknas'}
+                          {maskPersonnummer(patient?.socialSecurityNumber)}
                         </div>
                       </div>
                       <span className="rounded-full border border-[#A9D8BE] bg-white px-3 py-1 text-xs font-bold text-[#0F6840]">
@@ -460,12 +544,13 @@ function DepartmentReferralList({
   );
 }
 
-function PatientActionPanel({
+export function PatientActionPanel({
   bookings,
   patientMap,
   treatmentLabel,
   pausedBookingIds,
   presetSearch,
+  presetAction,
   onPause,
   onCancel,
 }: {
@@ -474,6 +559,7 @@ function PatientActionPanel({
   treatmentLabel: string;
   pausedBookingIds: Set<number>;
   presetSearch: string;
+  presetAction?: QuickActionType | null;
   onPause: (bookingId: number) => void;
   onCancel: (booking: BookingDto) => void;
 }) {
@@ -487,6 +573,10 @@ function PatientActionPanel({
     const id = window.setTimeout(() => setQuery(presetSearch), 0);
     return () => window.clearTimeout(id);
   }, [presetSearch]);
+  useEffect(() => {
+    if (!presetAction) return;
+    setSelectedAction(presetAction);
+  }, [presetAction]);
   const activeBookings = bookings
     .filter((booking) => booking.status !== 'Cancelled')
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -516,6 +606,11 @@ function PatientActionPanel({
     cancel: 'Den planerade tiden avbokas och behandlingsenheten får orsaken.',
     end: 'Behandlingsserien markeras som avslutad och behandlingsenheten får orsaken.',
   };
+  const actionReasonSuggestions: Record<QuickActionType, string[]> = {
+    pause: ['Tillfällig försämring', 'Somatisk orsak', 'Patienten avstår tillfälligt'],
+    cancel: ['Patienten kan inte komma', 'Transport/bemanning saknas', 'Medicinsk orsak'],
+    end: ['Behandlingsserie klar', 'Avslutas enligt läkarbeslut', 'Patienten önskar avsluta'],
+  };
 
   function openAction(action: QuickActionType) {
     setSelectedAction(action);
@@ -538,7 +633,7 @@ function PatientActionPanel({
       onCancel(matchedBooking);
     }
 
-    setSentMessage(`${actionLabels[selectedAction]} är skickad till behandlingsenheten.`);
+    setSentMessage(`${actionLabels[selectedAction]} är skickad till behandlingsenheten för ${patient.fullName}.`);
     closeAction();
   }
 
@@ -560,7 +655,7 @@ function PatientActionPanel({
                 onClick={() => setQuery(demoPatient.socialSecurityNumber)}
                 className="rounded-full border border-[#C9D6E6] bg-white px-3 py-1.5 text-xs font-semibold text-[#185FA5] hover:border-[#1A4F8A] hover:bg-[#EFF6FF]"
               >
-                Testa {demoPatient.socialSecurityNumber}
+                Testa {maskPersonnummer(demoPatient.socialSecurityNumber)}
               </button>
             ))}
           </div>
@@ -573,7 +668,7 @@ function PatientActionPanel({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={examplePatient ? `Sök personnummer, t.ex. ${examplePatient.socialSecurityNumber}` : 'Sök personnummer'}
+          placeholder={examplePatient ? `Sök personnummer, t.ex. ${maskPersonnummer(examplePatient.socialSecurityNumber)}` : 'Sök personnummer'}
           className="w-full rounded-xl border border-[#DDE3EC] bg-white py-3 pl-10 pr-3 text-sm focus:border-[#1A4F8A] focus:outline-none focus:ring-2 focus:ring-[#1A4F8A]/20"
         />
       </div>
@@ -582,7 +677,7 @@ function PatientActionPanel({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#C9D6E6] bg-white p-4 shadow-sm">
           <div>
             <div className="text-base font-bold text-[#1A2332]">{patient.fullName}</div>
-            <div className="mt-0.5 font-mono text-xs text-[#64748B]">{patient.socialSecurityNumber}</div>
+            <div className="mt-0.5 font-mono text-xs text-[#64748B]">{maskPersonnummer(patient.socialSecurityNumber)}</div>
             <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
               <div>
                 <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Tid</div>
@@ -653,7 +748,7 @@ function PatientActionPanel({
 
             <div className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4 text-sm">
               <div className="font-bold text-[#1A2332]">{patient.fullName}</div>
-              <div className="font-mono text-xs text-[#64748B]">{patient.socialSecurityNumber}</div>
+              <div className="font-mono text-xs text-[#64748B]">{maskPersonnummer(patient.socialSecurityNumber)}</div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Behandling</div>
@@ -669,6 +764,18 @@ function PatientActionPanel({
             <label className="mt-4 block text-sm font-bold text-[#1A2332]" htmlFor="quick-action-comment">
               Orsak / kommentar *
             </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {actionReasonSuggestions[selectedAction].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setComment((current) => current.trim() ? current : suggestion)}
+                  className="rounded-full border border-[#C9D6E6] bg-white px-3 py-1.5 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
             <textarea
               id="quick-action-comment"
               value={comment}
@@ -682,6 +789,9 @@ function PatientActionPanel({
                 Kommentar krävs innan åtgärden kan skickas.
               </p>
             )}
+            <p className="mt-2 text-xs text-[#64748B]">
+              Åtgärden sparas som en händelse till behandlingsenheten. Använd kort och tydlig orsak.
+            </p>
 
             <div className="mt-5 flex flex-wrap justify-end gap-3">
               <button
@@ -711,15 +821,14 @@ function PatientActionPanel({
 
 export default function DashboardPage() {
   const { t, locale } = useLanguage();
+  const { user } = useAuth();
   const location = useLocation();
   const routeNavigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(() => getDateParam(location.search) ?? toYMD(new Date()));
-  const [pausedBookingIds, setPausedBookingIds] = useState<Set<number>>(() => new Set());
   const [showAcuteOnly, setShowAcuteOnly] = useState(false);
-  const [patientActionSearch, setPatientActionSearch] = useState('');
   const moduleView = getModuleView(location.pathname, location.search);
-  const portalMode = getPortalMode();
-  const referralMetaByBookingId = getAllBookingReferralMeta();
+  const portalMode = getAllowedPortalMode(user?.role);
+  const referralMetaByBookingId = getAllBookingReferralMeta(DEMO_MODE);
 
   const bookingsQuery = useQuery({ queryKey: ['bookings'], queryFn: getBookings });
   const patientsQuery = useQuery({ queryKey: ['patients'], queryFn: getPatients });
@@ -796,9 +905,10 @@ export default function DashboardPage() {
     setSelectedDate(toYMD(d));
   }
 
-  function openPrintList() {
+  function openPrintList(moduleOverride?: 'ect' | 'rtms' | 'all') {
     const params = new URLSearchParams({ date: selectedDate });
-    if (moduleView === 'ect' || moduleView === 'rtms') params.set('module', moduleView);
+    const printModule = moduleOverride ?? moduleView;
+    if (printModule === 'ect' || printModule === 'rtms') params.set('module', printModule);
     routeNavigate(`/print/daily-list?${params.toString()}`);
   }
 
@@ -848,8 +958,9 @@ export default function DashboardPage() {
       icon: CalendarCheck,
       actions: [
         { label: 'Se bekräftad tid', route: '/confirmed-bookings' },
-        { label: 'Pausa behandling', route: '/confirmed-bookings' },
-        { label: 'Avboka tid', route: '/confirmed-bookings' },
+        { label: 'Pausa behandling', route: `/patient-atgard?module=${treatmentParam}&action=pause` },
+        { label: 'Avboka tid', route: `/patient-atgard?module=${treatmentParam}&action=cancel` },
+        { label: 'Avsluta behandling', route: `/patient-atgard?module=${treatmentParam}&action=end` },
       ],
     },
   ] : [];
@@ -891,16 +1002,34 @@ export default function DashboardPage() {
             <span aria-hidden="true">›</span>
           </button>
           {portalMode === 'admin' && (
-            <>
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[#DDE3EC] bg-white p-1">
               <button
                 type="button"
-                onClick={openPrintList}
-                className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#1A4F8A] bg-white px-3 text-xs font-semibold text-[#185FA5] transition-colors hover:bg-[#EFF6FF]"
+                onClick={() => openPrintList()}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-[#185FA5] transition-colors hover:bg-[#EFF6FF]"
               >
-                <Printer size={15} aria-hidden="true" />
-                Skriv ut lista
+                <Printer size={14} aria-hidden="true" />
+                Skriv ut
               </button>
-            </>
+              {moduleView === 'all' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openPrintList('ect')}
+                    className="h-7 rounded-md px-2.5 text-xs font-semibold text-[#4B5770] transition-colors hover:bg-[#F0F4F8]"
+                  >
+                    ECT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openPrintList('rtms')}
+                    className="h-7 rounded-md px-2.5 text-xs font-semibold text-[#4B5770] transition-colors hover:bg-[#F0F4F8]"
+                  >
+                    rTMS
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -940,7 +1069,7 @@ export default function DashboardPage() {
                 <div key={booking.bookingId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E5A3A6] bg-white px-3 py-2">
                   <div>
                     <div className="font-bold text-[#1A2332]">{patient.fullName}</div>
-                    <div className="font-mono text-xs text-[#64748B]">{patient.socialSecurityNumber}</div>
+                    <div className="font-mono text-xs text-[#64748B]">{maskPersonnummer(patient.socialSecurityNumber)}</div>
                   </div>
                   <div className="text-xs text-[#4B5770]">
                     <div className="font-bold text-[#9F1D1D]">{formatTime(booking.date)} · {TREATMENT_TYPE_LABELS[booking.treatmentTypeId]}</div>
@@ -949,11 +1078,8 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setPatientActionSearch(patient.socialSecurityNumber);
+                      routeNavigate(`/patient-atgard?module=${moduleView === 'rtms' ? 'rtms' : 'ect'}&pnr=${encodeURIComponent(patient.socialSecurityNumber)}`);
                       setShowAcuteOnly(false);
-                      window.setTimeout(() => {
-                        document.getElementById('patient-action-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 0);
                     }}
                     className="rounded-lg border border-[#C42B2B] px-3 py-1.5 text-xs font-bold text-[#9F1D1D] hover:bg-[#FDEAEA]"
                   >
@@ -1000,16 +1126,6 @@ export default function DashboardPage() {
               ))}
             </div>
           </section>
-
-          <PatientActionPanel
-            bookings={visibleBookings}
-            patientMap={patientMap}
-            treatmentLabel={treatmentLabel}
-            pausedBookingIds={pausedBookingIds}
-            presetSearch={patientActionSearch}
-            onPause={(bookingId) => setPausedBookingIds((current) => new Set(current).add(bookingId))}
-            onCancel={(booking) => handleStatusChange(booking, 'Cancelled', booking.priority)}
-          />
         </>
       )}
 
@@ -1039,29 +1155,36 @@ export default function DashboardPage() {
       )}
 
       {!backendUnavailable && !isLoading && portalMode === 'admin' && (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_210px]">
-          <div>
-            {(moduleView === 'all' || moduleView === 'ect') && (
-              <SlotTable
-                title={t('morningBlock')}
-                slots={buildSlots(ECT_TIMES, 'ECT')}
-                onStatusChange={handleStatusChange}
-                referralMetaByBookingId={referralMetaByBookingId}
-              />
-            )}
-            {(moduleView === 'all' || moduleView === 'rtms') && (
-              <SlotTable
-                title={t('afternoonBlock')}
-                slots={buildSlots(RTMS_TIMES, 'rTMS')}
-                onStatusChange={handleStatusChange}
-                referralMetaByBookingId={referralMetaByBookingId}
-              />
-            )}
+        <>
+          <AdminDaySummary
+            bookings={visibleBookings}
+            moduleView={moduleView}
+            onNavigate={routeNavigate}
+          />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_210px]">
+            <div>
+              {(moduleView === 'all' || moduleView === 'ect') && (
+                <SlotTable
+                  title={t('morningBlock')}
+                  slots={buildSlots(ECT_TIMES, 'ECT')}
+                  onStatusChange={handleStatusChange}
+                  referralMetaByBookingId={referralMetaByBookingId}
+                />
+              )}
+              {(moduleView === 'all' || moduleView === 'rtms') && (
+                <SlotTable
+                  title={t('afternoonBlock')}
+                  slots={buildSlots(RTMS_TIMES, 'rTMS')}
+                  onStatusChange={handleStatusChange}
+                  referralMetaByBookingId={referralMetaByBookingId}
+                />
+              )}
+            </div>
+            <div className="space-y-4">
+              <StandbyList bookings={visibleBookings} patientMap={patientMap} />
+            </div>
           </div>
-          <div className="space-y-4">
-            <StandbyList bookings={visibleBookings} patientMap={patientMap} />
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { getPatients } from '../api/patients';
 import { DEMO_MODE } from '../config/demo';
 import { getDemoBookings } from '../utils/demoBookings';
 import { getAllBookingReferralMeta } from '../utils/bookingMeta';
+import { getReferralLogistics } from '../utils/careLogistics';
 import {
   TREATMENT_TYPE_LABELS,
   isEctType,
@@ -17,6 +18,12 @@ import {
   type PatientDto,
 } from '../types';
 import { getRtmsSessionPlan, rtmsSessionPlanShortLabel } from '../utils/rtmsTreatmentPlan';
+
+function printRoute(date: string, module: string | null) {
+  const params = new URLSearchParams({ date });
+  if (module === 'ect' || module === 'rtms') params.set('module', module);
+  return `/print/daily-list?${params.toString()}`;
+}
 
 function todayYmd() {
   return new Date().toISOString().slice(0, 10);
@@ -45,6 +52,11 @@ function statusLabel(status: BookingStatus) {
   if (status === 'Confirmed') return 'Bekräftad';
   if (status === 'Cancelled') return 'Avbokad';
   return 'Väntar';
+}
+
+function preparationLabel(booking: BookingDto) {
+  if (isEctType(booking.treatmentTypeId)) return 'Fasta / anestesi / läkemedel';
+  return 'Kontraindikationer / implantat';
 }
 
 function moduleLabel(module: string | null) {
@@ -113,12 +125,16 @@ function DailyTable({
               <th className="p-2">Status</th>
               <th className="p-2">Avdelning</th>
               <th className="p-2">Kontakt</th>
+              <th className="p-2">Enhet / logistik</th>
+              <th className="p-2">Förberedelse</th>
+              <th className="p-2">Klart</th>
             </tr>
           </thead>
           <tbody>
             {bookings.map((booking) => {
               const patient = patientMap[booking.patientId] ?? demoPatient(booking.patientId);
               const rtmsPlan = getRtmsSessionPlan(booking);
+              const logistics = getReferralLogistics(booking.referralDepartment || '', booking.treatmentTypeId);
               return (
                 <tr key={booking.bookingId} className="border-b border-[#E2E8F0] align-top">
                   <td className="p-2 font-mono font-bold text-[#1A2332]">{formatTime(booking.date)}</td>
@@ -132,6 +148,25 @@ function DailyTable({
                   <td className="p-2">
                     <div>{booking.referralContactName || 'Ej angivet'}</div>
                     <div className="text-xs text-[#64748B]">{booking.referralContactPhone || ''}</div>
+                  </td>
+                  <td className="p-2">
+                    <div className="font-semibold">{logistics.recommendedUnit.name}</div>
+                    {logistics.requiresTransport ? (
+                      <div className="text-xs font-bold text-[#875100]">Transport planeras</div>
+                    ) : (
+                      <div className="text-xs text-[#64748B]">{logistics.sourceSite}</div>
+                    )}
+                  </td>
+                  <td className="p-2 text-xs">
+                    <div className="font-semibold text-[#1A2332]">{preparationLabel(booking)}</div>
+                    {booking.priority === 'Red' && <div className="mt-1 font-bold text-[#9F1D1D]">Akut prioritet</div>}
+                  </td>
+                  <td className="p-2">
+                    <div className="space-y-1 text-xs text-[#4B5770]">
+                      <label className="flex items-center gap-1"><span className="inline-block h-3 w-3 border border-[#64748B]" /> Förberedd</label>
+                      <label className="flex items-center gap-1"><span className="inline-block h-3 w-3 border border-[#64748B]" /> Transport</label>
+                      <label className="flex items-center gap-1"><span className="inline-block h-3 w-3 border border-[#64748B]" /> Utförd</label>
+                    </div>
                   </td>
                 </tr>
               );
@@ -148,9 +183,10 @@ export default function PrintDailyListPage() {
   const [searchParams] = useSearchParams();
   const date = searchParams.get('date') ?? todayYmd();
   const module = searchParams.get('module');
+  const selectedModule = module === 'ect' || module === 'rtms' ? module : null;
   const bookingsQuery = useQuery({ queryKey: ['bookings'], queryFn: getBookings });
   const patientsQuery = useQuery({ queryKey: ['patients'], queryFn: getPatients });
-  const referralMetaByBookingId = getAllBookingReferralMeta();
+  const referralMetaByBookingId = getAllBookingReferralMeta(DEMO_MODE);
 
   const bookings = useMemo(() => {
     const apiBookings = bookingsQuery.data ?? [];
@@ -187,10 +223,15 @@ export default function PrintDailyListPage() {
       <style>
         {`
           @media print {
+            @page { size: A4 landscape; margin: 10mm; }
             .no-print { display: none !important; }
             body { background: white !important; }
+            main { font-size: 11px; }
+            h1 { font-size: 22px !important; }
+            h2 { font-size: 16px !important; }
             table { page-break-inside: auto; }
             tr { page-break-inside: avoid; page-break-after: auto; }
+            th, td { padding: 5px !important; }
           }
         `}
       </style>
@@ -203,14 +244,46 @@ export default function PrintDailyListPage() {
         >
           Tillbaka
         </button>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1A4F8A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163F70]"
-        >
-          <Printer size={18} aria-hidden="true" />
-          Skriv ut / spara som PDF
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <a
+            href={printRoute(date, null)}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              selectedModule === null
+                ? 'border-[#1A4F8A] bg-[#EFF6FF] text-[#185FA5]'
+                : 'border-[#C9D6E6] bg-white text-[#4B5770] hover:bg-[#F0F4F8]'
+            }`}
+          >
+            Samlad lista
+          </a>
+          <a
+            href={printRoute(date, 'ect')}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              selectedModule === 'ect'
+                ? 'border-[#1A4F8A] bg-[#EFF6FF] text-[#185FA5]'
+                : 'border-[#C9D6E6] bg-white text-[#4B5770] hover:bg-[#F0F4F8]'
+            }`}
+          >
+            Bara ECT
+          </a>
+          <a
+            href={printRoute(date, 'rtms')}
+            className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+              selectedModule === 'rtms'
+                ? 'border-[#1A4F8A] bg-[#EFF6FF] text-[#185FA5]'
+                : 'border-[#C9D6E6] bg-white text-[#4B5770] hover:bg-[#F0F4F8]'
+            }`}
+          >
+            Bara rTMS
+          </a>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#1A4F8A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163F70]"
+          >
+            <Printer size={18} aria-hidden="true" />
+            Skriv ut / spara som PDF
+          </button>
+        </div>
       </div>
 
       <header className="mb-6 border-b-4 border-[#1A2332] pb-5">
@@ -222,6 +295,9 @@ export default function PrintDailyListPage() {
             <h1 className="text-3xl font-black text-[#1A2332]">Dagens behandlingslista</h1>
             <p className="mt-1 text-lg text-[#4B5770] capitalize">{formatDate(date)}</p>
             <p className="mt-1 text-sm text-[#64748B]">Urval: {moduleLabel(module)}</p>
+            <p className="mt-2 text-xs text-[#64748B]">
+              Arbetslista för passet. Använd rutorna längst till höger för lokal avstämning under dagen.
+            </p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg border border-[#DDE3EC] p-3">

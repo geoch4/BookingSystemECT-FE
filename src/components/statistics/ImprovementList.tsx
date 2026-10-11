@@ -6,6 +6,11 @@ export default function ImprovementList({ items }: { items: Improvement[] }) {
   return (
     <section style={styles.card} aria-labelledby="improvement-heading">
       <h2 id="improvement-heading" style={styles.sectionTitle}>Behöver utvecklas</h2>
+      {items.length === 0 && (
+        <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '12px 0' }}>
+          Inga förbättringspunkter i vald vy.
+        </div>
+      )}
       {items.map((item) => {
         const tone = toneStyles[item.tone];
         const Icon = item.tone === 'akut' ? AlertTriangle : item.tone === 'warn' ? Clock : CheckCircle2;

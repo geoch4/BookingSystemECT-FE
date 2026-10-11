@@ -1,3 +1,5 @@
 const demoFlag = import.meta.env.VITE_ENABLE_DEMO_DATA;
 
-export const DEMO_MODE = demoFlag === 'true' || (import.meta.env.DEV && demoFlag !== 'false');
+// Demo data and demo login accounts are only allowed during local development.
+// Production builds must never enable frontend-created demo tokens.
+export const DEMO_MODE = import.meta.env.DEV && demoFlag !== 'false';

@@ -10,8 +10,90 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import BackendErrorState from '../components/common/BackendErrorState';
 import Spinner from '../components/common/Spinner';
 import EmptyState from '../components/common/EmptyState';
+import {
+  getAppRole,
+  getPermissionsForAppRole,
+  getPermissionsForRole,
+  roleDisplayName,
+  type AppRole,
+  type Permission,
+} from '../utils/permissions';
 
 type Tab = 'treatments' | 'users' | 'roles';
+
+const APP_ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+  unknown: 'Rollen saknar systembehörighet.',
+  department: 'Avdelningspersonal kan skapa remisser, följa egna patienter och hantera patientåtgärder.',
+  'treatment-unit': 'Behandlingsenheten kan se dagens lista, remisskö och bekräfta tider.',
+  'medical-responsible': 'Medicinskt ansvarig kan prioritera remisser och fatta kliniska beslut.',
+  admin: 'Administratör kan hantera system, roller, användare och spårbarhet.',
+};
+
+const APP_ROLE_LABELS: Record<AppRole, string> = {
+  unknown: 'Ingen behörighet',
+  department: 'Avdelning',
+  'treatment-unit': 'Behandlingsenhet',
+  'medical-responsible': 'Medicinskt ansvarig',
+  admin: 'Administratör',
+};
+
+const PERMISSION_LABELS: Record<Permission, string> = {
+  viewDepartmentPortal: 'Avdelningsportal',
+  viewTreatmentPortal: 'Behandlingsportal',
+  viewDailyList: 'Dagens lista',
+  viewReferralQueue: 'Remisskö',
+  viewCalendar: 'Kalender',
+  viewDocuments: 'Styrdokument',
+  viewStatistics: 'Statistik',
+  createReferral: 'Skapa remiss',
+  viewOwnPatients: 'Mina patienter',
+  viewConfirmedTimes: 'Bekräftade tider',
+  setDepartmentPriority: 'Avd-prio',
+  recordPatientAction: 'Patientåtgärd',
+  requestCompletion: 'Begär komplettering',
+  prioritizeReferral: 'Prioritera',
+  confirmElvisBooking: 'Bekräfta tid',
+  manageClinicalDecision: 'Kliniskt beslut',
+  manageUsers: 'Användare',
+  manageSettings: 'Inställningar',
+  viewAuditLog: 'Loggar',
+};
+
+function RoleMeaning({ roleName }: { roleName?: string }) {
+  const appRole = getAppRole(roleName);
+  return (
+    <div>
+      <span className="rounded-full border border-[#C9D6E6] bg-[#EFF6FF] px-2 py-1 text-xs font-bold text-[#185FA5]">
+        {roleDisplayName(roleName)}
+      </span>
+      <div className="mt-1 text-xs text-[#8494AA]">{appRole === 'unknown' ? 'Rollen saknar systembehörighet.' : APP_ROLE_DESCRIPTIONS[appRole]}</div>
+    </div>
+  );
+}
+
+function PermissionChips({ roleName, limit = 5 }: { roleName?: string; limit?: number }) {
+  const permissions = getPermissionsForRole(roleName);
+  return <PermissionChipList permissions={permissions} limit={limit} />;
+}
+
+function PermissionChipList({ permissions, limit = 5 }: { permissions: Permission[]; limit?: number }) {
+  const visible = permissions.slice(0, limit);
+  const hidden = permissions.length - visible.length;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {visible.map((permission) => (
+        <span key={permission} className="rounded-full border border-[#DDE3EC] bg-white px-2 py-0.5 text-xs font-semibold text-[#4B5770]">
+          {PERMISSION_LABELS[permission]}
+        </span>
+      ))}
+      {hidden > 0 && (
+        <span className="rounded-full border border-[#DDE3EC] bg-[#F8FAFC] px-2 py-0.5 text-xs font-semibold text-[#64748B]">
+          +{hidden}
+        </span>
+      )}
+    </div>
+  );
+}
 
 // ─── Shared modal primitives ──────────────────────────────────────────────────
 
@@ -230,7 +312,7 @@ function UsersTab() {
           <table className="w-full">
             <thead><tr className="text-left text-xs font-medium text-[#8494AA] uppercase tracking-wider border-b border-[#DDE3EC]">
               <th scope="col" className="px-4 py-3">ID</th><th scope="col" className="px-4 py-3">Namn</th>
-              <th scope="col" className="px-4 py-3">E-post</th><th scope="col" className="px-4 py-3">Roll</th><th scope="col" className="px-4 py-3">Vårdenhet</th><th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
+              <th scope="col" className="px-4 py-3">E-post</th><th scope="col" className="px-4 py-3">Roll</th><th scope="col" className="px-4 py-3">Systemvy</th><th scope="col" className="px-4 py-3">Vårdenhet</th><th scope="col" className="px-4 py-3"><span className="sr-only">Åtgärder</span></th>
             </tr></thead>
             <tbody>
               {users.map((u: UserDto) => (
@@ -239,9 +321,15 @@ function UsersTab() {
                   <td className="px-4 py-3 text-sm font-medium text-[#1A2332]">{u.fullname}</td>
                   <td className="px-4 py-3 text-sm text-[#4B5770]">{u.email}</td>
                   <td className="px-4 py-3">
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-[#EFF6FF] text-[#2563EB]">
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-[#F8FAFC] text-[#4B5770] border border-[#DDE3EC]">
                       {u.roleName ?? '–'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 min-w-[220px]">
+                    <RoleMeaning roleName={u.roleName} />
+                    <div className="mt-2">
+                      <PermissionChips roleName={u.roleName} limit={3} />
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-[#4B5770]">{u.careUnitId || '–'}</td>
                   <td className="px-4 py-3">
@@ -330,6 +418,25 @@ function RolesTab() {
           <BackendErrorState error={error} onRetry={() => void refetch()} />
         </div>
       )}
+      <div className="mb-4 rounded-2xl border border-[#DDE3EC] bg-white p-4 shadow-sm">
+        <div className="mb-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Behörighetsöversikt</div>
+          <div className="mt-1 text-sm font-semibold text-[#1A2332]">
+            Systemet tolkar rollnamn till en arbetsvy. Kontrollera att rollnamnen matchar rätt ansvar.
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {(['department', 'treatment-unit', 'medical-responsible', 'admin'] as const).map((appRole) => (
+            <div key={appRole} className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-3">
+              <div className="text-sm font-bold text-[#1A2332]">{APP_ROLE_LABELS[appRole]}</div>
+              <p className="mt-1 text-xs text-[#64748B]">{APP_ROLE_DESCRIPTIONS[appRole]}</p>
+              <div className="mt-3">
+                <PermissionChipList permissions={getPermissionsForAppRole(appRole)} limit={6} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="bg-white rounded-xl border border-[#DDE3EC]">
         {isLoading ? <LoadingRow /> : isError ? null : roles.length === 0 ? <EmptyRow text="Inga roller registrerade." /> : (
           <table className="w-full">

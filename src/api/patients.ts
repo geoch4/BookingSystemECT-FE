@@ -40,3 +40,9 @@ function normalizePatientPayload(dto: CreatePatientDto): CreatePatientDto {
     integrationStatus: dto.integrationStatus ?? 'Manual',
   };
 }
+
+export interface PatientUnitMembership {unitId:string;kind:'department'|'treatment';isActive:boolean;reason:string;updatedAt?:string;}
+export const getPatientUnits = (id:number) => client.get<PatientUnitMembership[]>('/patients/'+id+'/care-units').then(r=>r.data);
+export const updatePatientUnit = (id:number, membership:PatientUnitMembership) => client.put('/patients/'+id+'/care-units',membership);
+export const transferPatient = (id:number, departmentId:string, reason:string) => client.post('/patients/'+id+'/transfer',{departmentId,reason});
+export const getDepartments = () => client.get<string[]>('/care-units/departments').then(r=>r.data);

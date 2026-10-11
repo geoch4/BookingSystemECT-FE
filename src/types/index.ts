@@ -40,6 +40,7 @@ export interface BookingDto {
   createdAt: string;
   priority: BookingPriority;
   status: BookingStatus;
+  departmentPriority?: number;
   referralDepartment?: string;
   referralContactName?: string;
   referralContactPhone?: string;
@@ -49,6 +50,8 @@ export interface BookingDto {
   externalPatientId?: string;
   sourceSystem?: string;
   careUnitId?: string;
+  departmentId?: string;
+  treatmentUnitId?: string;
   regionCode?: string;
   integrationStatus?: IntegrationStatus;
 }
@@ -62,6 +65,7 @@ export interface CreateBookingDto {
   createdAt: string;
   priority: BookingPriority;
   status: BookingStatus;
+  departmentPriority?: number;
   referralDepartment?: string;
   referralContactName?: string;
   referralContactPhone?: string;
@@ -71,6 +75,8 @@ export interface CreateBookingDto {
   externalPatientId?: string;
   sourceSystem?: string;
   careUnitId?: string;
+  departmentId?: string;
+  treatmentUnitId?: string;
   regionCode?: string;
   integrationStatus?: IntegrationStatus;
 }
@@ -104,6 +110,8 @@ export interface UserDto {
   roleId?: number;
   roleName?: string;
   careUnitId?: string;
+  departmentId?: string;
+  treatmentUnitId?: string;
 }
 
 // CreateUserDto is used when a new user is created.
@@ -113,6 +121,8 @@ export interface CreateUserDto {
   password: string;
   roleId: number;
   careUnitId?: string;
+  departmentId?: string;
+  treatmentUnitId?: string;
 }
 
 // UpdateUserDto is used when a user is updated.
@@ -123,6 +133,8 @@ export interface UpdateUserDto {
   password?: string;
   roleId?: number;
   careUnitId?: string;
+  departmentId?: string;
+  treatmentUnitId?: string;
 }
 
 // LoginDto is sent to the backend when logging in.
@@ -195,7 +207,14 @@ export type ReferralStatus =
   | 'Rejected'
   | 'NoShow';
 
-export type ReferralActionType = 'CompletionRequested' | 'CompletionSubmitted' | 'Prioritized' | 'TimeConfirmed';
+export type ReferralActionType =
+  | 'CompletionRequested'
+  | 'CompletionSubmitted'
+  | 'Prioritized'
+  | 'TimeConfirmed'
+  | 'PatientPaused'
+  | 'PatientCancelled'
+  | 'PatientEnded';
 
 export interface ReferralDto {
   referralId: number;
@@ -206,6 +225,7 @@ export interface ReferralDto {
   contactName?: string;
   contactPhone?: string;
   priority: BookingPriority;
+  departmentPriority?: number;
   status: ReferralStatus;
   requestedStartDate?: string;
   createdAt: string;
@@ -213,6 +233,8 @@ export interface ReferralDto {
   externalPatientId?: string;
   sourceSystem?: string;
   careUnitId?: string;
+  departmentId?: string;
+  treatmentUnitId?: string;
   regionCode?: string;
   integrationStatus?: IntegrationStatus;
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Activity, ArrowRight, Brain, Check, Plus } from 'lucide-react';
 import type { ModuleCardData, ModuleTone } from '../../utils/mockData';
 
@@ -46,7 +46,7 @@ const styles: Record<string, CSSProperties> = {
     padding: 20,
     boxShadow: '0 5px 16px rgba(23, 32, 51, 0.09)',
     display: 'flex', flexDirection: 'column',
-    cursor: 'pointer',
+    cursor: 'default',
     transition: 'transform 0.14s ease, box-shadow 0.18s ease, border-color 0.18s ease',
     textAlign: 'left', width: '100%',
   },
@@ -114,10 +114,6 @@ function parseCapacity(label: string): { booked: number; total: number } {
   return { booked: 0, total: 1 };
 }
 
-function handleKey(e: KeyboardEvent<HTMLDivElement>, route: string, onOpen: (r: string) => void) {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(route); }
-}
-
 export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardProps) {
   const [hovered, setHovered] = useState(false);
   const visual = moduleVisuals[module.id] ?? moduleVisuals.ect;
@@ -132,13 +128,9 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
   const available = Math.max(total - booked, 0);
 
   return (
-    <div
+    <article
       className="module-card-interactive"
-      role="button"
-      tabIndex={0}
       aria-label={`Öppna ${module.title}`}
-      onClick={() => onOpen(module.route)}
-      onKeyDown={(e) => handleKey(e, module.route, onOpen)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -205,7 +197,7 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
               type="button"
               className="module-status-chip"
               style={{ ...styles.seg, color: '#0F6840', background: '#DDF2E7', border: '1px solid #A9D8BE' }}
-              onClick={(event) => { event.stopPropagation(); onStatusOpen(readyRow.route); }}
+            onClick={() => onStatusOpen(readyRow.route)}
               aria-label={`${readyRow.count} ${readyRow.label}`}
             >
               <span style={{ ...styles.segDot, background: 'var(--ok-color)' }} />
@@ -218,7 +210,7 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
               type="button"
               className="module-status-chip"
               style={{ ...styles.seg, color: '#875100', background: '#FFF0CC', border: '1px solid #E6C77A' }}
-              onClick={(event) => { event.stopPropagation(); onStatusOpen(waitRow.route); }}
+              onClick={() => onStatusOpen(waitRow.route)}
               aria-label={`${waitRow.count} ${waitRow.label}`}
             >
               <span style={{ ...styles.segDot, background: 'var(--warn-color)' }} />
@@ -231,7 +223,7 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
               type="button"
               className="module-status-chip"
               style={{ ...styles.seg, color: '#45566B', background: '#E8EEF4', border: '1px solid #C3CEDA' }}
-              onClick={(event) => { event.stopPropagation(); onOpen(`${module.route}&action=book`); }}
+              onClick={() => onOpen(`${module.route}&action=book`)}
               aria-label={`${available} lediga platser, boka tid`}
             >
               <span style={{ ...styles.segDot, background: 'var(--border-strong)' }} />
@@ -248,7 +240,7 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
             type="button"
             style={styles.acuteChip}
             aria-label={`${akutCount} akuta fall – öppna akutflödet`}
-            onClick={(e) => { e.stopPropagation(); if (akutRow) onStatusOpen(akutRow.route); }}
+            onClick={() => { if (akutRow) onStatusOpen(akutRow.route); }}
             onMouseEnter={(e) => { e.currentTarget.style.background = '#fadddf'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--akut-bg)'; }}
           >
@@ -261,7 +253,9 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
           </span>
         )}
 
-        <span
+        <button
+          type="button"
+          onClick={() => onOpen(module.route)}
           style={{
             ...styles.openBtn,
             border: `1px solid ${visual.border}`,
@@ -272,8 +266,8 @@ export default function ModuleCard({ module, onOpen, onStatusOpen }: ModuleCardP
           }}
         >
           Öppna {module.title} <ArrowRight size={15} aria-hidden="true" />
-        </span>
+        </button>
       </div>
-    </div>
+    </article>
   );
 }

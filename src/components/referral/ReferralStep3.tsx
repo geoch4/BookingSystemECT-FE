@@ -1,5 +1,6 @@
 import { isEctType } from '../../types';
 import type { EctReferralDetails, FormState, HealthDeclaration, RtmsReferralDetails } from './referralTypes';
+import { rtmsSessionPlanLabel, type RtmsSessionPlan } from '../../utils/rtmsTreatmentPlan';
 
 interface Props {
   form: FormState;
@@ -29,6 +30,10 @@ export default function ReferralStep3({ form, setForm, onSubmit, onBack, isLoadi
     setForm({ ...form, rtms: { ...form.rtms, ...patch } });
   }
 
+  function updateRtmsSessionPlan(sessionPlan: RtmsSessionPlan) {
+    updateRtms({ sessionPlan });
+  }
+
   function updateEctDocument(field: keyof EctReferralDetails['documents'], checked: boolean) {
     setForm({
       ...form,
@@ -52,11 +57,27 @@ export default function ReferralStep3({ form, setForm, onSubmit, onBack, isLoadi
   const canSubmit = isEctReferral
     ? h.fastaOk !== null && form.ect.indication.trim() && ectDocumentsComplete
     : form.rtms.indication.trim()
+      && form.rtms.sessionPlan !== null
       && form.rtms.previousTreatments.trim()
       && form.rtms.contraindicationChecklistComplete !== null
       && form.rtms.metalImplantsOrDevices !== null
       && form.rtms.seizureHistory !== null
       && rtmsDocumentsComplete;
+  const missingItems = isEctReferral
+    ? [
+        !form.ect.indication.trim() ? 'Indikation för ECT' : null,
+        h.fastaOk === null ? 'Fastekrav' : null,
+        !ectDocumentsComplete ? 'Obligatoriska ECT-underlag' : null,
+      ].filter((item): item is string => Boolean(item))
+    : [
+        form.rtms.sessionPlan === null ? 'rTMS-upplägg: singel eller dubbel' : null,
+        !form.rtms.indication.trim() ? 'Indikation för rTMS' : null,
+        !form.rtms.previousTreatments.trim() ? 'Tidigare behandlingsförsök' : null,
+        form.rtms.contraindicationChecklistComplete === null ? 'Kontraindikationschecklista' : null,
+        form.rtms.metalImplantsOrDevices === null ? 'Implantat/medicinteknisk utrustning' : null,
+        form.rtms.seizureHistory === null ? 'Epilepsi/krampanamnes' : null,
+        !rtmsDocumentsComplete ? 'Obligatoriska rTMS-underlag' : null,
+      ].filter((item): item is string => Boolean(item));
 
   return (
     <div>
@@ -68,6 +89,23 @@ export default function ReferralStep3({ form, setForm, onSubmit, onBack, isLoadi
           ? 'Fyll i ECT-specifika uppgifter, hälsodeklaration och dokumentkontroll.'
           : 'Fyll i rTMS-specifika uppgifter, kontraindikationer och tidigare behandlingar.'}
       </p>
+
+      {missingItems.length > 0 ? (
+        <div className="mb-5 rounded-xl border border-[#E6C77A] bg-[#FFF8E8] p-4">
+          <div className="text-sm font-bold text-[#875100]">Kvar innan du kan granska remissen</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {missingItems.map((item) => (
+              <span key={item} className="rounded-full border border-[#E6C77A] bg-white px-3 py-1 text-xs font-bold text-[#875100]">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mb-5 rounded-xl border border-[#A9D8BE] bg-[#E8F7F1] p-4 text-sm font-bold text-[#0F6840]">
+          Alla obligatoriska delar är ifyllda. Du kan gå vidare och granska remissen.
+        </div>
+      )}
 
       {isEctReferral ? (
         <div className="space-y-4">
@@ -190,6 +228,41 @@ export default function ReferralStep3({ form, setForm, onSubmit, onBack, isLoadi
         </div>
       ) : (
         <div className="space-y-4">
+          <div className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4">
+            <label className="block text-sm font-semibold text-[#1A2332] mb-2">
+              Behandlingsupplägg <span className="text-[#C42B2B]">*</span>
+            </label>
+            <p className="mb-3 text-xs text-[#8494AA]">
+              Markera om patienten planeras för singel- eller dubbelbehandling. Detta visas sedan i remisskö och bokningsvy.
+            </p>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {(['single', 'double'] as const).map((plan) => (
+                <button
+                  key={plan}
+                  type="button"
+                  onClick={() => updateRtmsSessionPlan(plan)}
+                  className={`rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                    form.rtms.sessionPlan === plan
+                      ? 'border-[#0F766E] bg-[#E8F7F1] text-[#0F766E]'
+                      : 'border-[#DDE3EC] bg-white text-[#4B5770] hover:border-[#0F766E]'
+                  }`}
+                >
+                  <div className="text-sm font-bold">{rtmsSessionPlanLabel(plan)}</div>
+                  <div className="mt-1 text-xs text-[#64748B]">
+                    {plan === 'double'
+                      ? 'Två rTMS-pass samma behandlingsdag.'
+                      : 'Ett rTMS-pass per behandlingsdag.'}
+                  </div>
+                </button>
+              ))}
+            </div>
+            {form.rtms.sessionPlan === null && (
+              <p className="mt-2 text-xs font-semibold text-[#C42B2B]">
+                Välj om rTMS ska vara singel- eller dubbelbehandling.
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-[#4B5770] mb-1">
               Indikation för rTMS <span className="text-[#C42B2B]">*</span>

@@ -35,7 +35,7 @@ client.interceptors.response.use(
 
   // If the backend returns an error, handle it here.
   (err) => {
-    if (err.response) {
+    if (import.meta.env.DEV && err.response) {
       console.error('[API ERROR]', err.config?.method?.toUpperCase(), err.config?.url, err.response.status);
       console.error('[API ERROR body]', JSON.stringify(err.response.data, null, 2));
     }
@@ -51,6 +51,10 @@ client.interceptors.response.use(
 
       // Send the user back to the login page.
       window.location.href = '/login';
+    }
+
+    if (err.response?.status === 403 && !isAuthEndpoint && window.location.pathname !== '/403') {
+      window.location.assign('/403');
     }
 
     // Re-throw the error so the page that made the request can show an error message.

@@ -26,6 +26,7 @@ import { getReferralQueueSnapshot } from '../repositories/referralRepository';
 import { isEctType, type BookingPriority, type CreateBookingDto, type PatientDto } from '../types';
 import { rtmsSessionPlanLabel } from '../utils/rtmsTreatmentPlan';
 import { useAuth } from '../context/useAuth';
+import { maskPersonnummer } from '../utils/personnummer';
 
 type QueueFilter = 'all' | 'acute' | 'needs-completion' | 'anesthesia' | 'ready';
 type QueueActionType = Extract<ReferralActionType, 'completion' | 'prioritize'>;
@@ -73,7 +74,8 @@ function QueueCard({
   onRequestCompletion,
   onPrioritize,
   canRequestCompletion,
-  canPrioritize,
+  canBookOrPrioritize,
+  prioritizeLabel,
 }: {
   referral: ReferralCase;
   note?: ReferralActionNote;
@@ -83,29 +85,30 @@ function QueueCard({
   onRequestCompletion: (referral: ReferralCase) => void;
   onPrioritize: (referral: ReferralCase) => void;
   canRequestCompletion: boolean;
-  canPrioritize: boolean;
+  canBookOrPrioritize: boolean;
+  prioritizeLabel: string;
 }) {
   const missingCount = referral.missingDocuments.length;
   const warningCount = referral.riskFlags.length;
 
   return (
-    <article className={`group relative overflow-hidden rounded-2xl border bg-[#FFFCF7] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#CBBBA8] hover:shadow-md ${
-      isOpen ? 'border-[#4F46E5] ring-2 ring-[#4F46E5]/10' : 'border-[#E3D8CB]'
+    <article className={`group relative overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:border-[#B8C7DA] hover:shadow-md ${
+      isOpen ? 'border-[#1A4F8A] ring-2 ring-[#1A4F8A]/10' : 'border-[#DDE3EC]'
     }`}>
       <div
         className={`absolute inset-y-0 left-0 w-1 transition-colors duration-200 ${
           isOpen
-            ? 'bg-[#4F46E5]'
+            ? 'bg-[#1A4F8A]'
             : referral.priority === 'Red'
               ? 'bg-[#C42B2B]'
-              : 'bg-transparent group-hover:bg-[#CBBBA8]'
+              : 'bg-transparent group-hover:bg-[#B8C7DA]'
         }`}
         aria-hidden="true"
       />
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full flex-wrap items-center justify-between gap-4 p-4 pl-5 text-left transition-colors duration-200 group-hover:bg-[#FBF7F0]"
+        className="flex w-full flex-wrap items-center justify-between gap-4 p-4 pl-5 text-left transition-colors duration-200 group-hover:bg-[#F8FAFC]"
         aria-expanded={isOpen}
       >
         <div className="min-w-0">
@@ -113,7 +116,7 @@ function QueueCard({
             <Link
               to={`/referrals/${referral.id}`}
               onClick={(event) => event.stopPropagation()}
-              className="text-lg font-bold text-[#1A2332] hover:text-[#4F46E5] hover:underline"
+              className="text-lg font-bold text-[#1A2332] hover:text-[#1A4F8A] hover:underline"
             >
               {referral.patient.fullName}
             </Link>
@@ -139,7 +142,7 @@ function QueueCard({
             )}
           </div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#64748B]">
-            <span className="font-mono">{referral.patient.socialSecurityNumber}</span>
+            <span className="font-mono">{maskPersonnummer(referral.patient.socialSecurityNumber)}</span>
             <span>{referral.treatmentLabel}</span>
             {referral.rtmsSessionPlan && <span className="font-semibold text-[#0F766E]">{rtmsSessionPlanLabel(referral.rtmsSessionPlan)}</span>}
             <span>{referral.department}</span>
@@ -157,15 +160,15 @@ function QueueCard({
           </div>
           <ChevronDown
             size={20}
-            className={`text-[#8494AA] transition-all duration-200 group-hover:text-[#4F46E5] ${isOpen ? 'rotate-180 text-[#4F46E5]' : ''}`}
+            className={`text-[#8494AA] transition-all duration-200 group-hover:text-[#1A4F8A] ${isOpen ? 'rotate-180 text-[#1A4F8A]' : ''}`}
             aria-hidden="true"
           />
         </div>
       </button>
 
-      {isOpen && <div className="border-t border-[#E5EAF1] p-4">
+      {isOpen && <div className="border-t border-[#E5EAF1] bg-[#F8FAFC] p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <div className="rounded-xl bg-[#FBF7F0] p-3 transition-colors hover:bg-[#F7F4FF]">
+          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Behandling</div>
             <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.treatmentLabel}</div>
             {referral.rtmsSessionPlan && (
@@ -174,15 +177,15 @@ function QueueCard({
               </div>
             )}
           </div>
-          <div className="rounded-xl bg-[#FBF7F0] p-3 transition-colors hover:bg-[#F7F4FF]">
+          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Önskad start</div>
             <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.requestedStartDate}</div>
           </div>
-          <div className="rounded-xl bg-[#FBF7F0] p-3 transition-colors hover:bg-[#F7F4FF]">
+          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Avdelning</div>
             <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.department}</div>
           </div>
-          <div className="rounded-xl bg-[#FBF7F0] p-3 transition-colors hover:bg-[#F7F4FF]">
+          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Kontakt</div>
             <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.contactName}</div>
             {referral.contactPhone && <div className="text-xs text-[#64748B]">{referral.contactPhone}</div>}
@@ -190,8 +193,8 @@ function QueueCard({
         </div>
 
         {referral.departmentPriority && (
-          <div className="mt-3 rounded-xl border border-[#C4B5FD] bg-[#F7F4FF] px-4 py-3">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#4F46E5]">Avdelningens interna rangordning</div>
+          <div className="mt-3 rounded-xl border border-[#DDE3EC] bg-white px-4 py-3">
+            <div className="text-xs font-bold uppercase tracking-wide text-[#1A4F8A]">Avdelningens interna rangordning</div>
             <div className="mt-1 text-sm font-semibold text-[#1A2332]">
               Prioritet {referral.departmentPriority} från {referral.department}. Använd som stöd när flera patienter från samma avdelning konkurrerar om tillgängliga ECT-platser.
             </div>
@@ -199,7 +202,7 @@ function QueueCard({
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
-          <section className="rounded-xl border border-[#E3D8CB] bg-[#FFFCF7] p-3 transition-colors duration-200 hover:border-[#CBBBA8] hover:bg-[#FBF7F0]">
+          <section className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#1A2332]">
               <ClipboardCheck size={16} aria-hidden="true" />
               Dokument
@@ -210,8 +213,8 @@ function QueueCard({
                   <span className="text-[#4B5770]">{document.label}</span>
                   <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
                     document.complete
-                      ? 'border-[#E3D8CB] bg-white text-[#4B5770]'
-                      : 'border-[#D9CBBB] bg-[#FBF7F0] text-[#1A2332]'
+                      ? 'border-[#DDE3EC] bg-[#F8FAFC] text-[#4B5770]'
+                      : 'border-[#DDE3EC] bg-white text-[#1A2332]'
                   }`}>
                     {document.complete ? 'Klar' : 'Saknas'}
                   </span>
@@ -220,7 +223,7 @@ function QueueCard({
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#E3D8CB] bg-[#FFFCF7] p-3 transition-colors duration-200 hover:border-[#CBBBA8] hover:bg-[#FBF7F0]">
+          <section className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#1A2332]">
               <MapPin size={16} aria-hidden="true" />
               Logistik
@@ -240,25 +243,25 @@ function QueueCard({
               </div>
             </div>
             {referral.logistics.transportLabel && (
-              <div className="mt-3 rounded-lg border border-[#E3D8CB] bg-[#FBF7F0] px-3 py-2 text-sm font-semibold text-[#4B5770]">
+              <div className="mt-3 rounded-lg border border-[#DDE3EC] bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#4B5770]">
                 Transport behöver planeras
               </div>
             )}
           </section>
 
-          <section className="rounded-xl border border-[#E3D8CB] bg-[#FFFCF7] p-3 transition-colors duration-200 hover:border-[#CBBBA8] hover:bg-[#FBF7F0]">
+          <section className="rounded-xl border border-[#DDE3EC] bg-white p-3">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#1A2332]">
               <ShieldAlert size={16} aria-hidden="true" />
               Risker
             </div>
             {referral.riskFlags.length === 0 ? (
-              <div className="rounded-lg border border-[#E3D8CB] bg-[#FBF7F0] px-3 py-2 text-sm font-semibold text-[#4B5770]">
+              <div className="rounded-lg border border-[#DDE3EC] bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#4B5770]">
                 Inga särskilda riskflaggor
               </div>
             ) : (
               <div className="space-y-2">
                 {referral.riskFlags.map((flag) => (
-                  <div key={flag.label} className="rounded-lg border border-[#E5A3A6] bg-[#FFF7F7] px-3 py-2 text-sm font-semibold text-[#9F1D1D]">
+                  <div key={flag.label} className="rounded-lg border border-[#F0B4B7] bg-white px-3 py-2 text-sm font-semibold text-[#9F1D1D]">
                     {flag.target === 'anesthesia' ? 'Anestesi: ' : ''}
                     {flag.label}
                   </div>
@@ -269,7 +272,7 @@ function QueueCard({
         </div>
 
         {(referral.logistics.transportLabel || referral.logistics.overflowOption) && (
-          <div className="mt-3 rounded-xl border border-[#E3D8CB] bg-[#FBF7F0] p-3 text-sm text-[#4B5770]">
+          <div className="mt-3 rounded-xl border border-[#DDE3EC] bg-white p-3 text-sm text-[#4B5770]">
             {referral.logistics.transportLabel && (
               <div><span className="font-bold text-[#1A2332]">Transport:</span> {referral.logistics.transportLabel}</div>
             )}
@@ -280,7 +283,7 @@ function QueueCard({
         )}
 
       {note && (
-        <div className="mt-3 rounded-xl border border-[#E3D8CB] bg-[#FBF7F0] p-3">
+        <div className="mt-3 rounded-xl border border-[#DDE3EC] bg-white p-3">
           <div className="text-sm font-bold text-[#1A2332]">{note.title}</div>
           <div className="mt-1 text-sm text-[#1A2332]">{note.comment}</div>
           <div className="mt-1 text-xs text-[#64748B]">
@@ -301,7 +304,7 @@ function QueueCard({
 
       <ReferralTimeline booking={referral.booking} note={note} events={events} />
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#FBF7F0] px-3 py-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DDE3EC] bg-white px-3 py-3">
         <div>
           <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Nästa steg</div>
           <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.nextStep}</div>
@@ -311,19 +314,24 @@ function QueueCard({
             <button
               type="button"
               onClick={() => onRequestCompletion(referral)}
-              className="rounded-lg border border-[#D9CBBB] px-3 py-2 text-xs font-bold text-[#4F46E5] hover:bg-[#F7F4FF]"
+              className="rounded-lg border border-[#C9D6E6] px-3 py-2 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
             >
               Begär komplettering
             </button>
           )}
-          {canPrioritize && (
+          {canBookOrPrioritize && (
             <button
               type="button"
               onClick={() => onPrioritize(referral)}
-              className="rounded-lg bg-[#4F46E5] px-3 py-2 text-xs font-bold text-white hover:bg-[#4338CA]"
+              className="rounded-lg bg-[#1A4F8A] px-3 py-2 text-xs font-bold text-white hover:bg-[#123E72]"
             >
-              Prioritera / boka
+              {prioritizeLabel}
             </button>
+          )}
+          {!canRequestCompletion && !canBookOrPrioritize && (
+            <span className="text-xs font-semibold text-[#64748B]">
+              Din roll kan läsa ärendet men inte fatta beslut här.
+            </span>
           )}
         </div>
       </div>
@@ -336,7 +344,10 @@ export default function AdminReferralQueuePage() {
   const qc = useQueryClient();
   const { hasAnyPermission, hasPermission } = useAuth();
   const canRequestCompletion = hasPermission('requestCompletion');
-  const canPrioritize = hasAnyPermission(['prioritizeReferral', 'confirmElvisBooking', 'manageClinicalDecision']);
+  const canPrioritize = hasAnyPermission(['prioritizeReferral', 'manageClinicalDecision']);
+  const canConfirmTime = hasPermission('confirmElvisBooking');
+  const canBookOrPrioritize = canPrioritize || canConfirmTime;
+  const prioritizeLabel = canPrioritize ? 'Prioritera / boka' : 'Bekräfta tid';
   const [filter, setFilter] = useState<QueueFilter>('all');
   const [openReferralId, setOpenReferralId] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<{ type: QueueActionType; referral: ReferralCase } | null>(null);
@@ -344,8 +355,12 @@ export default function AdminReferralQueuePage() {
   const [selectedPriority, setSelectedPriority] = useState<BookingPriority>('Green');
   const [bookingDate, setBookingDate] = useState(todayYmd());
   const [bookingTime, setBookingTime] = useState('09:00');
-  const [localActionNotes, setLocalActionNotes] = useState(getReferralActionSnapshot);
-  const [localActionEvents, setLocalActionEvents] = useState(getReferralActionEventSnapshot);
+  const [localActionNotes, setLocalActionNotes] = useState<ReturnType<typeof getReferralActionSnapshot>>(
+    () => DEMO_MODE ? getReferralActionSnapshot() : {},
+  );
+  const [localActionEvents, setLocalActionEvents] = useState<ReturnType<typeof getReferralActionEventSnapshot>>(
+    () => DEMO_MODE ? getReferralActionEventSnapshot() : {},
+  );
   const [demoBookings, setDemoBookings] = useState(getDemoBookings);
   const bookingsQuery = useQuery({ queryKey: ['bookings'], queryFn: getBookings });
   const patientsQuery = useQuery({ queryKey: ['patients'], queryFn: getPatients });
@@ -360,7 +375,7 @@ export default function AdminReferralQueuePage() {
     () => Object.fromEntries((patientsQuery.data ?? []).map((patient) => [patient.patientId, patient])),
     [patientsQuery.data],
   );
-  const referralMetaByBookingId = useMemo(() => getAllBookingReferralMeta(), []);
+  const referralMetaByBookingId = useMemo(() => getAllBookingReferralMeta(DEMO_MODE), []);
   const backendUnavailable = !DEMO_MODE && (bookingsQuery.isError || patientsQuery.isError);
   const isLoading = !DEMO_MODE && (bookingsQuery.isLoading || patientsQuery.isLoading);
   const updateBookingMutation = useMutation({
@@ -447,6 +462,9 @@ export default function AdminReferralQueuePage() {
 
   function submitAction() {
     if (!activeAction || !comment.trim()) return;
+    if (activeAction.type === 'completion' && !canRequestCompletion) return;
+    if (activeAction.type === 'prioritize' && !canBookOrPrioritize) return;
+
     const confirmedDateTime = activeAction.type === 'prioritize' ? `${bookingDate}T${bookingTime}:00` : undefined;
 
     const note: ReferralActionNote = {
@@ -476,7 +494,7 @@ export default function AdminReferralQueuePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F4F0EA] p-6">
+    <main className="min-h-screen bg-[#F3F6FA] p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#1A2332]">Remisskö</h1>
         <p className="mt-1 text-sm text-[#8494AA]">
@@ -484,7 +502,19 @@ export default function AdminReferralQueuePage() {
         </p>
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-5">
+      <div className="mb-4 rounded-2xl border border-[#DDE3EC] bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Arbetsvy</div>
+            <div className="mt-1 text-sm font-semibold text-[#1A2332]">
+              Välj en kategori. Öppna sedan ett patientkort i taget för detaljer och beslut.
+            </div>
+          </div>
+          <div className="text-xs font-semibold text-[#64748B]">
+            {filtered.length} visas · ett ärende öppnas åt gången
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
         {[
           { key: 'all' as const, label: 'Alla', count: counts.all, icon: ClipboardCheck },
           { key: 'acute' as const, label: 'Akuta', count: counts.acute, icon: AlertTriangle },
@@ -495,28 +525,23 @@ export default function AdminReferralQueuePage() {
           <button
             key={item.key}
             type="button"
-            onClick={() => setFilter(item.key)}
-            className={`group relative overflow-hidden rounded-2xl border bg-[#FFFCF7] p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#CBBBA8] hover:shadow-md ${
-              filter === item.key ? 'border-[#4F46E5] shadow-sm ring-2 ring-[#4F46E5]/10' : 'border-[#E3D8CB]'
+            onClick={() => {
+              setFilter(item.key);
+              setOpenReferralId(null);
+            }}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold transition-colors ${
+              filter === item.key ? 'border-[#1A4F8A] bg-[#EFF6FF] text-[#185FA5]' : 'border-[#DDE3EC] bg-white text-[#4B5770] hover:bg-[#F8FAFC]'
             }`}
           >
-            <div
-              className={`absolute inset-x-0 top-0 h-1 transition-colors duration-200 ${
-                filter === item.key ? 'bg-[#4F46E5]' : 'bg-transparent group-hover:bg-[#CBBBA8]'
-              }`}
-              aria-hidden="true"
-            />
             <item.icon
-              size={20}
-              className={`transition-colors duration-200 ${
-                filter === item.key ? 'text-[#4F46E5]' : 'text-[#8494AA] group-hover:text-[#4F46E5]'
-              }`}
+              size={16}
               aria-hidden="true"
             />
-            <div className="mt-3 text-2xl font-black text-[#1A2332]">{item.count}</div>
-            <div className="text-xs font-bold uppercase tracking-wide text-[#64748B]">{item.label}</div>
+            <span>{item.label}</span>
+            <span className="rounded-full bg-[#F0F4F8] px-2 py-0.5 text-xs text-[#1A2332]">{item.count}</span>
           </button>
         ))}
+        </div>
       </div>
 
       {backendUnavailable && (
@@ -551,7 +576,8 @@ export default function AdminReferralQueuePage() {
                 onRequestCompletion={(item) => openAction('completion', item)}
                 onPrioritize={(item) => openAction('prioritize', item)}
                 canRequestCompletion={canRequestCompletion}
-                canPrioritize={canPrioritize}
+                canBookOrPrioritize={canBookOrPrioritize}
+                prioritizeLabel={prioritizeLabel}
               />
             ))
           )}
@@ -564,7 +590,7 @@ export default function AdminReferralQueuePage() {
             <div className="mb-4">
               <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Remissåtgärd</div>
               <h2 className="mt-1 text-xl font-bold text-[#1A2332]">
-                {activeAction.type === 'completion' ? 'Begär komplettering' : 'Prioritera / boka'}
+                {activeAction.type === 'completion' ? 'Begär komplettering' : prioritizeLabel}
               </h2>
               <p className="mt-1 text-sm text-[#64748B]">
                 {activeAction.type === 'completion'
@@ -575,7 +601,7 @@ export default function AdminReferralQueuePage() {
 
             <div className="rounded-xl border border-[#E3D8CB] bg-[#FBF7F0] p-4 text-sm">
               <div className="font-bold text-[#1A2332]">{activeAction.referral.patient.fullName}</div>
-              <div className="font-mono text-xs text-[#64748B]">{activeAction.referral.patient.socialSecurityNumber}</div>
+              <div className="font-mono text-xs text-[#64748B]">{maskPersonnummer(activeAction.referral.patient.socialSecurityNumber)}</div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Behandling</div>
@@ -597,6 +623,7 @@ export default function AdminReferralQueuePage() {
                       <button
                         key={priority}
                         type="button"
+                        disabled={!canPrioritize}
                         onClick={() => setSelectedPriority(priority)}
                         className={`rounded-lg border px-3 py-2 text-xs font-bold ${
                           selectedPriority === priority

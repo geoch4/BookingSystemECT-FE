@@ -47,6 +47,15 @@ export function formatPersonnummer(value: string) {
   return value.trim();
 }
 
+export function maskPersonnummer(value?: string | null) {
+  const digits = onlyDigits(value ?? '');
+
+  if (digits.length === 12) return `${digits.slice(0, 8)}-****`;
+  if (digits.length === 10) return `${digits.slice(0, 6)}-****`;
+  if (value?.trim()) return 'Personnummer dolt';
+  return 'Personnummer saknas';
+}
+
 export function validatePersonnummer(value: string): PersonnummerValidation {
   const digits = onlyDigits(value);
 

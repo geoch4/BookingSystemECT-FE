@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getBookings, createBooking, updateBooking, deleteBooking } from '../api/bookings';
 import { getPatients } from '../api/patients';
+import { canAccessResource, currentScopeUser } from '../utils/resourceScope';
 import { useAuth } from '../context/useAuth';
 import type { BookingDto, BookingPriority, BookingStatus, CreateBookingDto, TreatmentType } from '../types';
 import { TREATMENT_TYPE_OPTIONS, TREATMENT_TYPE_LABELS, isEctType } from '../types';
@@ -15,6 +16,7 @@ import Spinner from '../components/common/Spinner';
 import { addHistoryEntry, deleteBookingHistory, getAllBookingHistory, type BookingHistoryEntry } from '../utils/bookingHistory';
 import { DEMO_MODE } from '../config/demo';
 import { fallbackPatient } from '../utils/referralCases';
+import { maskPersonnummer } from '../utils/personnummer';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   Pending: 'Väntande',
@@ -249,7 +251,7 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate, onPreviewU
     if (isEdit) {
       // Only log a history entry when status or priority actually changed.
       if (existing && (existing.status !== dto.status || existing.priority !== dto.priority)) {
-        addHistoryEntry(existing.bookingId, {
+        if (DEMO_MODE) addHistoryEntry(existing.bookingId, {
           timestamp: new Date().toISOString(),
           fromStatus: existing.status,
           toStatus: dto.status,
@@ -434,6 +436,7 @@ function BookingModal({ existing, bookings, onClose, onPreviewCreate, onPreviewU
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BookingsPage() {
+  const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [modal, setModal] = useState<{ open: boolean; booking?: BookingDto }>({ open: false });
@@ -454,9 +457,9 @@ export default function BookingsPage() {
   const isLoading = !DEMO_MODE && (bookingsQuery.isLoading || patientsQuery.isLoading);
   // Falls back to mock/demo bookings only when demo mode is on and the backend has no real data yet.
   const usingMockData = DEMO_MODE && (bookingsQuery.isError || apiBookings.length === 0);
-  const bookings = usingMockData ? [...previewBookings, ...MOCK_BOOKINGS] : apiBookings;
+  const bookings = (usingMockData ? [...previewBookings, ...MOCK_BOOKINGS] : apiBookings).filter(booking => canAccessResource(currentScopeUser(), booking));
   const backendUnavailable = !DEMO_MODE && (bookingsQuery.isError || patientsQuery.isError);
-  const isNewBookingFromUrl = searchParams.get('action') === 'new';
+  const isNewBookingFromUrl = isAdmin && searchParams.get('action') === 'new';
 
   function closeModal() {
     setModal({ open: false });
@@ -498,9 +501,8 @@ export default function BookingsPage() {
     ...bookings.map((booking) => [booking.patientId, fallbackPatient(booking.patientId)] as const),
     ...patients.map((p) => [p.patientId, p] as const),
   ]);
-  // Fetches metadata so each booking row can show department/contact.
-  const referralMetaByBookingId = getAllBookingReferralMeta();
-  const historyByBookingId = getAllBookingHistory();
+  const referralMetaByBookingId = getAllBookingReferralMeta(DEMO_MODE);
+  const historyByBookingId = DEMO_MODE ? getAllBookingHistory() : {};
 
   // Applies the status filter, then sorts newest-first for display.
   const filtered = filter === 'all' ? bookings : bookings.filter((b) => b.status === filter);
@@ -522,7 +524,7 @@ export default function BookingsPage() {
         </div>
         <button
           onClick={() => setModal({ open: true })}
-          disabled={backendUnavailable && !usingMockData}
+          disabled={!isAdmin || (backendUnavailable && !usingMockData)}
           className="bg-[#185FA5] text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-[0_5px_14px_rgba(24,95,165,0.24)] hover:bg-[#124F8A] hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(24,95,165,0.30)] active:translate-y-0 transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           + Ny bokning
@@ -624,7 +626,7 @@ export default function BookingsPage() {
                         <td className="px-4 py-3 text-sm font-mono font-semibold text-[#4B5770] whitespace-nowrap group-hover:text-[#185FA5] transition-colors">{formatDateTime(b.date)}</td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-semibold text-[#1A2332] group-hover:text-[#124F8A] transition-colors">{patient?.fullName ?? `#${b.patientId}`}</div>
-                          <div className="text-xs text-[#8494AA] font-mono">{patient?.socialSecurityNumber ?? '–'}</div>
+                          <div className="text-xs text-[#8494AA] font-mono">{maskPersonnummer(patient?.socialSecurityNumber)}</div>
                           {referralMeta?.department && (
                             <div className="text-xs text-[#8494AA] mt-0.5">{referralMeta.department}</div>
                           )}
@@ -660,12 +662,14 @@ export default function BookingsPage() {
                               </button>
                             )}
                             <button
+                              disabled={!isAdmin}
                               onClick={() => setModal({ open: true, booking: b })}
                               className="rounded-md bg-[#EAF4FC] px-2.5 py-1.5 text-xs font-semibold text-[#185FA5] hover:bg-[#D7EAF9] hover:-translate-y-px transition-all whitespace-nowrap"
                             >
                               Redigera
                             </button>
                             <button
+                              disabled={!isAdmin}
                               onClick={() => setConfirmDialog({ bookingId: b.bookingId })}
                               className="rounded-md bg-[#FDEAEA] px-2.5 py-1.5 text-xs font-semibold text-[#C42B2B] hover:bg-[#F8D5D7] hover:-translate-y-px transition-all"
                             >
@@ -720,7 +724,7 @@ export default function BookingsPage() {
       </div>
 
       {/* Create/edit modal. Creates go through the preview flow while running on mock data. */}
-      {(modal.open || isNewBookingFromUrl) && (
+      {isAdmin && (modal.open || isNewBookingFromUrl) && (
         <BookingModal
           existing={modal.booking}
           bookings={bookings}
@@ -731,7 +735,7 @@ export default function BookingsPage() {
       )}
 
       {/* Delete confirmation, shown before the delete mutation actually fires */}
-      {confirmDialog && (
+      {isAdmin && confirmDialog && (
         <ConfirmDialog
           title="Radera bokning"
           message="Bokningen tas bort permanent och kan inte återställas."
@@ -742,7 +746,7 @@ export default function BookingsPage() {
               return;
             }
             deleteBookingReferralMeta(confirmDialog.bookingId);
-            deleteBookingHistory(confirmDialog.bookingId);
+            if (DEMO_MODE) deleteBookingHistory(confirmDialog.bookingId);
             deleteMutation.mutate(confirmDialog.bookingId);
             setConfirmDialog(null);
           }}

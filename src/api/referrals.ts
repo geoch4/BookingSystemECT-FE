@@ -52,3 +52,20 @@ export const confirmReferralTime = (referralId: number | string, dto: CreateRefe
     ...dto,
     actionType: 'TimeConfirmed',
   }, auditConfig(options)).then((response) => response.data);
+
+export const updateReferralDepartmentPriority = (
+  referralId: number | string,
+  departmentPriority?: number,
+  options?: AuditRequestOptions,
+) =>
+  client.patch<ReferralDto>(`/referrals/${referralId}/department-priority`, {
+    departmentPriority,
+  }, auditConfig(options)).then((response) => response.data);
+
+export const recordReferralPatientAction = (
+  referralId: number | string,
+  dto: CreateReferralActionDto,
+  options?: AuditRequestOptions,
+) =>
+  client.post<ReferralActionDto>(`/referrals/${referralId}/actions/patient-action`, dto, auditConfig(options))
+    .then((response) => response.data);

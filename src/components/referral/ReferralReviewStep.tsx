@@ -1,4 +1,6 @@
-import { TREATMENT_TYPE_LABELS } from '../../types';
+import { isRtmsType, TREATMENT_TYPE_LABELS } from '../../types';
+import { maskPersonnummer } from '../../utils/personnummer';
+import { rtmsSessionPlanLabel } from '../../utils/rtmsTreatmentPlan';
 import type { FormState } from './referralTypes';
 
 interface Props {
@@ -13,6 +15,7 @@ export default function ReferralReviewStep({ form, onBack, onSubmit, isLoading, 
   const patientName = form.patient?.fullName || form.newPatientName;
   const patientPnr = form.patient?.socialSecurityNumber || form.newPatientPnr;
   const externalPatientId = form.externalPatientId || form.patient?.externalPatientId;
+  const isRtmsReferral = form.treatmentType !== null && isRtmsType(form.treatmentType);
 
   return (
     <div>
@@ -31,7 +34,7 @@ export default function ReferralReviewStep({ form, onBack, onSubmit, isLoading, 
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Personnummer</div>
-              <div className="mt-1 text-sm font-semibold text-[#1A2332]">{patientPnr}</div>
+              <div className="mt-1 text-sm font-semibold text-[#1A2332]">{maskPersonnummer(patientPnr)}</div>
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Extern referens</div>
@@ -57,7 +60,64 @@ export default function ReferralReviewStep({ form, onBack, onSubmit, isLoading, 
               <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Prioritet</div>
               <div className="mt-1 text-sm font-semibold text-[#1A2332]">{form.priority}</div>
             </div>
+            {isRtmsReferral && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">rTMS-upplägg</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">
+                  {rtmsSessionPlanLabel(form.rtms.sessionPlan)}
+                </div>
+              </div>
+            )}
           </div>
+        </section>
+
+        <section className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4">
+          <h3 className="text-sm font-bold text-[#1A2332] mb-3">
+            {isRtmsReferral ? 'rTMS-underlag' : 'ECT-underlag'}
+          </h3>
+          {isRtmsReferral ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Indikation</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">{form.rtms.indication || 'Ej angiven'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Tidigare behandlingar</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">{form.rtms.previousTreatments || 'Ej angiven'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Anestesi</div>
+                <div className="mt-1 text-sm font-semibold text-[#0F766E]">Ej aktuellt för rTMS</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Fasta</div>
+                <div className="mt-1 text-sm font-semibold text-[#0F766E]">Ej aktuellt för rTMS</div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Indikation</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">{form.ect.indication || 'Ej angiven'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Fastekrav</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">
+                  {form.health.fastaOk === null ? 'Ej angivet' : form.health.fastaOk ? 'Uppfyllt' : 'Bruten fasta'}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Anestesiunderlag</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">
+                  {form.ect.documents.anesthesiaAssessment ? 'Kontrollerat' : 'Saknas'}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Somatisk risk</div>
+                <div className="mt-1 text-sm font-semibold text-[#1A2332]">{form.ect.somaticRisk || 'Ej angiven'}</div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4">

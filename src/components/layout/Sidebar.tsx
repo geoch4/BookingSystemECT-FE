@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
-import { BarChart3, CalendarCheck, CalendarDays, ClipboardList, FileText, ListChecks, Plus, Settings, Users, Zap } from 'lucide-react';
+import { BarChart3, CalendarCheck, CalendarDays, ClipboardList, FileText, ListChecks, PauseCircle, Plus, Settings, Users, Zap } from 'lucide-react';
 import LanguageSwitch from '../common/LanguageSwitch';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAllowedPortalMode, portalLabels } from '../../config/portal';
@@ -19,6 +19,7 @@ const departmentNavItems: NavItem[] = [
   { to: '/ny-remiss', labelKey: 'newReferral', icon: Plus, end: false, permission: 'createReferral' },
   { to: '/referrals', labelKey: 'referrals', icon: ClipboardList, end: false, permission: 'viewOwnPatients' },
   { to: '/bekraftade-tider', labelKey: 'bookedTimes', icon: CalendarCheck, end: false, permission: 'viewConfirmedTimes' },
+  { to: '/patient-atgard', labelKey: 'patientAction', icon: PauseCircle, end: false, permission: 'recordPatientAction' },
 ];
 
 const coordinatorNavItems: NavItem[] = [
@@ -36,7 +37,9 @@ const doctorNavItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
   { to: '/', labelKey: 'start', icon: Zap, end: true },
+  { to: '/remissko', labelKey: 'referralQueue', icon: ClipboardList, end: false, permission: 'viewReferralQueue' },
   { to: '/dagens-lista', labelKey: 'dailyList', icon: CalendarCheck, end: false, permission: 'viewDailyList' },
+  { to: '/bookings?action=new', labelKey: 'newBooking', icon: Plus, end: false, permission: 'confirmElvisBooking' },
   { to: '/calendar', labelKey: 'calendar', icon: CalendarDays, end: false, permission: 'viewCalendar' },
   { to: '/documents', labelKey: 'documents', icon: FileText, end: false, permission: 'viewDocuments' },
   { to: '/statistik', labelKey: 'statistics', icon: BarChart3, end: false, permission: 'viewStatistics' },
@@ -64,6 +67,7 @@ export default function Sidebar() {
   const baseNavItems = getNavItems(portalMode, appRole);
   const navItems = baseNavItems.filter((item) => !item.permission || hasPermission(item.permission));
   const portal = portalLabels[portalMode];
+  const roleLabel = roleDisplayName(user?.role);
 
   return (
     <aside aria-label="Sidopanel" style={{
@@ -90,6 +94,18 @@ export default function Sidebar() {
             <div style={{ fontSize: 15, fontWeight: 750, color: '#fff', lineHeight: 1.1 }}>{portal.title}</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#8494AA' }}>{portal.subtitle}</div>
           </div>
+        </div>
+        <div style={{
+          marginTop: 12,
+          border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 10,
+          background: 'rgba(255,255,255,0.06)',
+          padding: '8px 10px',
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9CA8B8' }}>
+            Inloggad roll
+          </div>
+          <div style={{ marginTop: 2, fontSize: 12.5, fontWeight: 750, color: '#F8FAFC' }}>{roleLabel}</div>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import ForbiddenPage from '../../pages/ForbiddenPage';
 import { useAuth } from '../../context/useAuth';
 import type { Permission } from '../../utils/permissions';
 
@@ -14,7 +15,7 @@ export default function PermissionRoute({ permission, permissions, children }: P
   const isAllowed = requiredPermissions.length === 0 || hasAnyPermission(requiredPermissions);
 
   if (!token || !user) return <Navigate to="/login" replace />;
-  if (!isAllowed) return <Navigate to="/" replace />;
+  if (!isAllowed) return <ForbiddenPage />;
 
   if (children) return <>{children}</>;
   return <Outlet />;
