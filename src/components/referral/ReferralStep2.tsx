@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
+import { getTreatmentUnits } from '../../api/bookings';
+import { useAuth } from '../../context/useAuth';
 import { useRef, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { TREATMENT_TYPE_OPTIONS, isEctType, isRtmsType, type TreatmentType } from '../../types';
@@ -13,6 +16,8 @@ interface Props {
 }
 
 export default function ReferralStep2({ form, setForm, onNext, onBack }: Props) {
+  const { user, isAdmin } = useAuth();
+  const units = useQuery({queryKey: ['treatment-units'], queryFn: getTreatmentUnits});
   // The department submits a referral request. The treatment unit assigns the exact time later.
   const preferredDateInputRef = useRef<HTMLInputElement>(null);
   const [showErrors, setShowErrors] = useState(false);
@@ -208,6 +213,14 @@ export default function ReferralStep2({ form, setForm, onNext, onBack }: Props) 
           </p>
         </div>
 
+        <div>
+          <label htmlFor="receiving-unit" className="block text-sm font-medium">Mottagande behandlingsenhet</label>
+          <select id="receiving-unit" value={form.treatmentUnitId} onChange={e => setForm({...form, treatmentUnitId: e.target.value})} className="mt-2 w-full rounded-lg border p-3">
+            <option value="">Inväntar tilldelning av administratör</option>
+            {(units.data ?? []).map(id => <option key={id} value={id}>{id}</option>)}
+          </select>
+          {units.isError && <p role="alert">Behandlingsenheter kunde inte hämtas. Försök igen.</p>}
+        </div>
         {/* The department block collects information about where the patient is from. */}
         <div className="border border-[#DDE3EC] rounded-xl p-4 bg-[#F8FAFC]">
           <h3 className="text-sm font-semibold text-[#1A2332] mb-1">Remitterande avdelning</h3>
@@ -219,6 +232,7 @@ export default function ReferralStep2({ form, setForm, onNext, onBack }: Props) 
               </label>
               <input
                 type="text"
+                disabled={!isAdmin && !!user?.careUnitId}
                 value={form.department}
                 onChange={(e) => setForm({ ...form, department: e.target.value })}
                 list="pilot-care-units"

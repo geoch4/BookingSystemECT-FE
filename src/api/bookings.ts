@@ -1,3 +1,4 @@
+import { canAccessResource, currentScopeUser } from '../utils/resourceScope';
 import client from './client';
 import type {
   AssessmentStatus,
@@ -79,7 +80,7 @@ function normalizeBooking(b: any): BookingDto {
 // GET /api/booking
 export const getBookings = () =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client.get<any[]>('/booking').then((r) => r.data.map(normalizeBooking));
+  client.get<any[]>('/booking').then((r) => r.data.map(normalizeBooking).filter((booking: BookingDto) => canAccessResource(currentScopeUser(), booking)));
 
 // Fetches a specific booking by bookingId.
 // GET /api/booking/{id}
@@ -106,3 +107,6 @@ export const updateBooking = (id: number, dto: CreateBookingDto, options?: Audit
 // DELETE /api/booking/{id}
 export const deleteBooking = (id: number, options?: AuditRequestOptions) =>
   client.delete(`/booking/${id}`, auditConfig(options));
+
+export const getTreatmentUnits = () => client.get<string[]>('/care-units/treatment').then(r => r.data);
+export const assignTreatmentUnit = (id: number, treatmentUnitId: string) => client.put('/booking/' + id + '/treatment-unit', {treatmentUnitId});

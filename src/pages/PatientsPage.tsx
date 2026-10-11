@@ -1,3 +1,4 @@
+import PatientUnitAccessDialog from '../components/common/PatientUnitAccessDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPatients, createPatient, updatePatient, deletePatient } from '../api/patients';
@@ -5,6 +6,7 @@ import type { PatientDto, CreatePatientDto } from '../types';
 import BackendErrorState from '../components/common/BackendErrorState';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Spinner from '../components/common/Spinner';
+import { maskPersonnummer } from '../utils/personnummer';
 
 // ─── Create/edit patient modal ─────────────────────────────────────────────────
 
@@ -111,6 +113,7 @@ function PatientModal({ existing, onClose }: PatientModalProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PatientsPage() {
+  const [accessPatientId,setAccessPatientId] = useState<number|null>(null);
   const qc = useQueryClient();
   const [modal, setModal] = useState<{ open: boolean; patient?: PatientDto }>({ open: false });
   const [confirmDialog, setConfirmDialog] = useState<{ patientId: number; name: string } | null>(null);
@@ -199,9 +202,10 @@ export default function PatientsPage() {
                   <tr key={p.patientId} className="border-b border-[#DDE3EC] hover:bg-[#F8FAFC] transition-colors">
                     <td className="px-4 py-3 text-sm font-mono text-[#8494AA]">#{p.patientId}</td>
                     <td className="px-4 py-3 text-sm font-medium text-[#1A2332]">{p.fullName}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-[#4B5770]">{p.socialSecurityNumber}</td>
+                    <td className="px-4 py-3 text-sm font-mono text-[#4B5770]">{maskPersonnummer(p.socialSecurityNumber)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
+                        <button className="text-xs text-[#1A4F8A]" onClick={()=>setAccessPatientId(p.patientId)}>Enhetsåtkomst</button>
                         <button
                           onClick={() => setModal({ open: true, patient: p })}
                           className="text-xs text-[#1A4F8A] hover:underline"
@@ -224,6 +228,7 @@ export default function PatientsPage() {
         )}
       </div>
 
+      {accessPatientId !== null && <PatientUnitAccessDialog patientId={accessPatientId} onClose={()=>setAccessPatientId(null)} />}
       {/* Create/edit modal, shared for both flows via the optional `patient` prop */}
       {modal.open && (
         <PatientModal

@@ -13,6 +13,7 @@ import { getAllBookingReferralMeta } from '../utils/bookingMeta';
 import { getDemoBookings } from '../utils/demoBookings';
 import { treatmentUnits, type TreatmentUnitId } from '../utils/careLogistics';
 import { buildReferralCases, type ReferralCase } from '../utils/referralCases';
+import { maskPersonnummer } from '../utils/personnummer';
 
 const ECT_CAPACITY = 15;
 const RTMS_CAPACITY = 15;
@@ -317,7 +318,7 @@ export default function CalendarOverviewPage() {
     () => Object.fromEntries((patientsQuery.data ?? []).map((patient) => [patient.patientId, patient])),
     [patientsQuery.data],
   );
-  const referralMetaByBookingId = useMemo(() => getAllBookingReferralMeta(), []);
+  const referralMetaByBookingId = useMemo(() => getAllBookingReferralMeta(DEMO_MODE), []);
   const days = useMemo(() => buildMonthDays(month), [month]);
   const byDate = useMemo(() => summarizeBookings(bookings), [bookings]);
   const referrals = useMemo(
@@ -634,7 +635,7 @@ export default function CalendarOverviewPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-bold text-[#1A2332]">{referral.patient.fullName}</div>
-                        <div className="font-mono text-xs text-[#64748B]">{referral.patient.socialSecurityNumber}</div>
+                        <div className="font-mono text-xs text-[#64748B]">{maskPersonnummer(referral.patient.socialSecurityNumber)}</div>
                       </div>
                       <span className={`rounded-full border px-3 py-1 text-xs font-bold ${referralStatusClass(referral)}`}>
                         {referralStatusLabel(referral)}
@@ -764,7 +765,7 @@ export default function CalendarOverviewPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-bold text-[#1A2332]">{referral.patient.fullName}</div>
-                        <div className="font-mono text-xs text-[#64748B]">{referral.patient.socialSecurityNumber}</div>
+                        <div className="font-mono text-xs text-[#64748B]">{maskPersonnummer(referral.patient.socialSecurityNumber)}</div>
                       </div>
                       <div className="text-right text-xs font-bold text-[#875100]">
                         {referral.booking.date.slice(0, 10)} kl. {referral.booking.date.slice(11, 16)}

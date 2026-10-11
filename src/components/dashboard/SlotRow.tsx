@@ -1,11 +1,14 @@
+import { useAuth } from '../../context/useAuth';
 import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import type { BookingDto, BookingPriority, BookingStatus, PatientDto } from '../../types';
 import type { BookingReferralMeta } from '../../utils/bookingMeta';
 import { addHistoryEntry } from '../../utils/bookingHistory';
+import { DEMO_MODE } from '../../config/demo';
 import CancelBookingDialog from '../common/CancelBookingDialog';
 import { useLanguage } from '../../context/LanguageContext';
 import { getRtmsSessionPlan, rtmsSessionPlanShortLabel } from '../../utils/rtmsTreatmentPlan';
+import { maskPersonnummer } from '../../utils/personnummer';
 
 export interface Slot {
   time: string;
@@ -32,6 +35,7 @@ interface SlotRowProps {
 
 export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, referralMeta }: SlotRowProps) {
   const { t } = useLanguage();
+  const { isAdmin } = useAuth();
   const [pendingCancel, setPendingCancel] = useState(false);
   const b = slot.booking;
   const cfg = slotStatus(b);
@@ -45,7 +49,8 @@ export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, r
     : t('waiting');
 
   function handleDropdownChange(status: BookingStatus, priority: BookingPriority) {
-    if (b && (status !== b.status || priority !== b.priority)) {
+    if (!isAdmin) return;
+    if (DEMO_MODE && b && (status !== b.status || priority !== b.priority)) {
       addHistoryEntry(b.bookingId, {
         timestamp: new Date().toISOString(),
         fromStatus: b.status,
@@ -58,8 +63,10 @@ export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, r
   }
 
   function handleConfirmCancel(reason: string) {
+    if (!isAdmin) return;
     setPendingCancel(false);
     if (b) {
+      if (DEMO_MODE) {
       addHistoryEntry(b.bookingId, {
         timestamp: new Date().toISOString(),
         fromStatus: b.status,
@@ -68,6 +75,7 @@ export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, r
         toPriority: b.priority,
         cancellationReason: reason || undefined,
       });
+      }
       onStatusChange(b, 'Cancelled', b.priority, reason || undefined);
     }
   }
@@ -80,7 +88,7 @@ export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, r
         <>
           <td className="px-2.5 py-2">
             <div className="text-sm font-medium text-[#1A2332] leading-tight">{slot.patient?.fullName ?? `#${b.patientId}`}</div>
-            <div className="text-xs text-[#8494AA] font-mono">{slot.patient?.socialSecurityNumber ?? '–'}</div>
+            <div className="text-xs text-[#8494AA] font-mono">{maskPersonnummer(slot.patient?.socialSecurityNumber)}</div>
             <div className="text-xs text-[#4B5770] mt-0.5">
               {t('department')}: <span className="font-semibold text-[#1A2332]">{referralMeta?.department || t('notSpecified')}</span>
             </div>
@@ -123,7 +131,7 @@ export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, r
           <td className="px-2.5 py-2">
             <div className="flex flex-col gap-1.5">
               <div className="relative">
-                <select
+                <select disabled={!isAdmin}
                   aria-label={`Ändra status för ${slot.patient?.fullName ?? `patient ${b.patientId}`}`}
                   value={`${b.status}:${b.priority}`}
                   onChange={(e) => {
@@ -144,6 +152,7 @@ export default function SlotRow({ slot, showAnesthesia = true, onStatusChange, r
               <button
                 type="button"
                 aria-label={`Avboka ${slot.patient?.fullName ?? `patient ${b.patientId}`} klockan ${slot.time}`}
+                disabled={!isAdmin}
                 onClick={() => setPendingCancel(true)}
                 className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-[#E5A3A6] bg-[#FFF7F7] px-2 text-xs font-semibold text-[#B4232A] shadow-sm transition-all hover:border-[#B4232A] hover:bg-[#FCEBEC] active:shadow-none focus:outline-none focus:ring-3 focus:ring-[#B4232A]/20"
               >

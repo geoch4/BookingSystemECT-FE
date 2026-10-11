@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import AppLayout from './components/layout/AppLayout';
 import AdminRoute from './components/routing/AdminRoute';
 import PermissionRoute from './components/routing/PermissionRoute';
+import ForbiddenPage from './pages/ForbiddenPage';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -17,6 +18,7 @@ import CalendarOverviewPage from './pages/CalendarOverviewPage';
 import DepartmentReferralsPage from './pages/DepartmentReferralsPage';
 import DepartmentConfirmedBookingsPage from './pages/DepartmentConfirmedBookingsPage';
 import PrintDailyListPage from './pages/PrintDailyListPage';
+import PatientActionPage from './pages/PatientActionPage';
 import AdminReferralQueuePage from './pages/AdminReferralQueuePage';
 import ReferralDetailPage from './pages/ReferralDetailPage';
 import AuditLogPage from './pages/AuditLogPage';
@@ -56,12 +58,13 @@ export default function App() {
             {/* All routes inside AppLayout share a common layout and sidebar. */}
             <Route element={<AppLayout />}>
               {/* The home page is the first page the user sees. */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/403" element={<ForbiddenPage />} />
+              <Route path="/" element={<PermissionRoute permissions={['viewDepartmentPortal', 'viewTreatmentPortal']}><LandingPage /></PermissionRoute>} />
               {/* Dashboard can show all blocks or be filtered via the query string. */}
               <Route
                 path="/dashboard"
                 element={(
-                  <PermissionRoute permission="viewDailyList">
+                  <PermissionRoute permissions={['viewDailyList', 'viewDepartmentPortal']}>
                     <DashboardPage />
                   </PermissionRoute>
                 )}
@@ -79,7 +82,7 @@ export default function App() {
               <Route
                 path="/rtms"
                 element={(
-                  <PermissionRoute permission="viewDailyList">
+                  <PermissionRoute permissions={['viewDailyList', 'viewDepartmentPortal']}>
                     <DashboardPage />
                   </PermissionRoute>
                 )}
@@ -197,6 +200,14 @@ export default function App() {
                 element={(
                   <PermissionRoute permission="viewConfirmedTimes">
                     <DepartmentConfirmedBookingsPage />
+                  </PermissionRoute>
+                )}
+              />
+              <Route
+                path="/patient-atgard"
+                element={(
+                  <PermissionRoute permission="recordPatientAction">
+                    <PatientActionPage />
                   </PermissionRoute>
                 )}
               />

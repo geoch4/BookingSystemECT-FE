@@ -205,12 +205,13 @@ function mapApiDocument(doc: DocumentDto): ClinicalDocument {
 
 // A single document's summary card, including its expiry status and external link.
 function DocCard({ doc }: { doc: ClinicalDocument }) {
+  const [isOpen, setIsOpen] = useState(false);
   const statusCfg = STATUS_CFG[doc.status];
   const typeCfg = TYPE_CFG[doc.typ];
   const days = daysUntil(doc.giltigTill);
 
   return (
-    <div className={`bg-white rounded-xl border p-5 hover:shadow-sm transition-shadow ${
+    <article className={`bg-white rounded-xl border p-5 hover:shadow-sm transition-shadow ${
       doc.status === 'utgangen' ? 'border-[#DDE3EC] opacity-70' :
       doc.status === 'utgarsSnart' ? 'border-[#D4860A]' : 'border-[#DDE3EC]'
     }`}>
@@ -236,32 +237,61 @@ function DocCard({ doc }: { doc: ClinicalDocument }) {
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-[#8494AA]">
-        <div>
-          <span>Ansvarig: {doc.ansvarig}</span>
-          <span className="mx-2">·</span>
-          <span>
-            {doc.status === 'utgangen'
-              ? `Utgick ${doc.giltigTill}`
-              : doc.status === 'utgarsSnart'
-              ? <span className="text-[#D4860A] font-medium">Utgår om {days} dagar ({doc.giltigTill})</span>
-              : `Giltig t.o.m. ${doc.giltigTill}`}
-          </span>
-        </div>
-        {doc.lank !== '#' && (
-          <a
-            href={doc.lank}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#1A4F8A] hover:underline font-medium"
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#8494AA]">
+        <span>
+          {doc.status === 'utgangen'
+            ? `Utgick ${doc.giltigTill}`
+            : doc.status === 'utgarsSnart'
+            ? <span className="text-[#D4860A] font-medium">Utgår om {days} dagar</span>
+            : `Giltig t.o.m. ${doc.giltigTill}`}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setIsOpen((current) => !current)}
+            className="rounded-lg border border-[#C9D6E6] bg-white px-3 py-1.5 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
           >
-            Öppna →
-          </a>
-        )}
+            {isOpen ? 'Stäng detaljer' : 'Visa detaljer'}
+          </button>
+          {doc.lank !== '#' && (
+            <a
+              href={doc.lank}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-[#185FA5] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#124F8A]"
+            >
+              Öppna dokument
+            </a>
+          )}
+        </div>
       </div>
 
-      <div className="mt-2 text-xs text-[#8494AA] font-mono opacity-60">{doc.dokumentId}</div>
-    </div>
+      {isOpen && (
+        <div className="mt-4 rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4 text-sm">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Dokument-ID</div>
+              <div className="mt-1 font-mono text-xs text-[#1A2332]">{doc.dokumentId}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Ansvarig</div>
+              <div className="mt-1 font-semibold text-[#1A2332]">{doc.ansvarig}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Giltig från</div>
+              <div className="mt-1 font-semibold text-[#1A2332]">{doc.giltigFran || 'Ej angivet'}</div>
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Giltig till</div>
+              <div className="mt-1 font-semibold text-[#1A2332]">{doc.giltigTill || 'Ej angivet'}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-xs text-[#64748B]">
+            Rekommenderat arbetssätt: dokumenten bör speglas från sjukhusets intranät och granskas av ansvarig funktion innan de publiceras i portalen.
+          </div>
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -321,7 +351,18 @@ export default function DocumentsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      <div className="mb-5 rounded-2xl border border-[#DDE3EC] bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Dokumentfilter</div>
+            <div className="mt-1 text-sm font-semibold text-[#1A2332]">
+              Sök, välj dokumenttyp och filtrera giltighet i samma vy.
+            </div>
+          </div>
+          <div className="text-xs font-semibold text-[#64748B]">{filtered.length} dokument visas</div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
         <input
           type="text"
           placeholder="Sök dokument..."
@@ -358,6 +399,7 @@ export default function DocumentsPage() {
               {count} {label}
             </button>
           ))}
+        </div>
         </div>
       </div>
 

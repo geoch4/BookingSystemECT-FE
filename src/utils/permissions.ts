@@ -12,6 +12,7 @@ export type Permission =
   | 'viewOwnPatients'
   | 'viewConfirmedTimes'
   | 'setDepartmentPriority'
+  | 'recordPatientAction'
   | 'requestCompletion'
   | 'prioritizeReferral'
   | 'confirmElvisBooking'
@@ -24,15 +25,18 @@ export type AppRole =
   | 'department'
   | 'treatment-unit'
   | 'medical-responsible'
-  | 'admin';
+  | 'admin'
+  | 'unknown';
 
 const rolePermissions: Record<AppRole, Permission[]> = {
+  unknown: [],
   department: [
     'viewDepartmentPortal',
     'createReferral',
     'viewOwnPatients',
     'viewConfirmedTimes',
     'setDepartmentPriority',
+    'recordPatientAction',
   ],
   'treatment-unit': [
     'viewTreatmentPortal',
@@ -53,62 +57,33 @@ const rolePermissions: Record<AppRole, Permission[]> = {
   admin: [
     'viewTreatmentPortal',
     'viewDailyList',
+    'viewReferralQueue',
     'viewCalendar',
     'viewDocuments',
     'viewStatistics',
+    'requestCompletion',
+    'prioritizeReferral',
+    'confirmElvisBooking',
+    'manageClinicalDecision',
     'manageUsers',
     'manageSettings',
     'viewAuditLog',
   ],
 };
 
+// Exact aliases must match the backend role catalog. Unknown roles grant nothing.
+const roleAliases: Record<string, AppRole> = {
+  admin: 'admin',
+  avdelning: 'department', 'remitterande avdelning': 'department',
+  vårdavdelning: 'department', mottagning: 'department',
+  'medicinskt ansvarig': 'medical-responsible', överläkare: 'medical-responsible',
+  underläkare: 'medical-responsible', läkare: 'medical-responsible',
+  ectsjuksköterska: 'treatment-unit', 'ect-koordinator': 'treatment-unit',
+  behandlingsenhet: 'treatment-unit', 'treatment unit': 'treatment-unit',
+};
+
 export function getAppRole(role?: string): AppRole {
-  const normalized = role?.trim().toLowerCase() ?? '';
-
-  if (normalized.includes('admin') || normalized.includes('administrat')) {
-    return 'admin';
-  }
-
-  if (
-    normalized.includes('avdelning')
-    || normalized.includes('mottagning')
-    || normalized.includes('vårdcentral')
-    || normalized.includes('vardcentral')
-    || normalized.includes('department')
-    || normalized.includes('ward')
-    || normalized.includes('clinic')
-  ) {
-    return 'department';
-  }
-
-  if (
-    normalized.includes('medicinskt ansvarig')
-    || normalized.includes('överläk')
-    || normalized.includes('overlak')
-    || normalized.includes('underläk')
-    || normalized.includes('underlak')
-    || normalized.includes('specialistläk')
-    || normalized.includes('specialistlak')
-    || normalized.includes('läkare')
-    || normalized.includes('lakare')
-    || normalized.includes('doctor')
-  ) {
-    return 'medical-responsible';
-  }
-
-  if (
-    normalized.includes('behandlingsenhet')
-    || normalized.includes('ect')
-    || normalized.includes('rtms')
-    || normalized.includes('koordinator')
-    || normalized.includes('coordinator')
-    || normalized.includes('narkos')
-    || normalized.includes('anestesi')
-  ) {
-    return 'treatment-unit';
-  }
-
-  return 'department';
+  return roleAliases[role?.trim().toLowerCase() ?? ''] ?? 'unknown';
 }
 
 export function hasPermission(role: string | undefined, permission: Permission) {
@@ -117,6 +92,14 @@ export function hasPermission(role: string | undefined, permission: Permission) 
 
 export function hasAnyPermission(role: string | undefined, permissions: Permission[]) {
   return permissions.some((permission) => hasPermission(role, permission));
+}
+
+export function getPermissionsForAppRole(appRole: AppRole) {
+  return [...rolePermissions[appRole]];
+}
+
+export function getPermissionsForRole(role?: string) {
+  return getPermissionsForAppRole(getAppRole(role));
 }
 
 export function getAllowedPortalByPermissions(role?: string): PortalMode {
@@ -129,5 +112,5 @@ export function roleDisplayName(role?: string) {
   if (appRole === 'admin') return 'Administratör';
   if (appRole === 'medical-responsible') return 'Medicinskt ansvarig';
   if (appRole === 'treatment-unit') return 'Behandlingsenhet';
-  return 'Avdelning';
+  return appRole === 'department' ? 'Avdelning' : 'Ingen behörighet';
 }

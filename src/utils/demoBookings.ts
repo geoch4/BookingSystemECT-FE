@@ -1,3 +1,4 @@
+import { canAccessResource, currentScopeUser } from './resourceScope';
 import type { BookingDto, CreateBookingDto } from '../types';
 
 const STORAGE_KEY = 'ect-demo-bookings';
@@ -28,6 +29,8 @@ function createSeedBooking(
     priority,
     status,
     referralDepartment,
+    departmentId: referralDepartment,
+    treatmentUnitId: 'ECT-enhet',
     referralContactName: 'Demo Kontakt',
     referralContactPhone: '031-000 00 00',
   };
@@ -85,7 +88,7 @@ function isLegacyBulkSeed(bookingId: number) {
   );
 }
 
-export function getDemoBookings(): BookingDto[] {
+function getAllDemoBookings(): BookingDto[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return SEEDED_DEMO_BOOKINGS;
@@ -112,16 +115,20 @@ export function addDemoBooking(dto: CreateBookingDto): BookingDto {
     createdAt: new Date().toISOString(),
   };
 
-  saveDemoBookings([booking, ...getDemoBookings()]);
+  saveDemoBookings([booking, ...getAllDemoBookings()]);
   return booking;
 }
 
 export function updateDemoBooking(updated: BookingDto) {
   saveDemoBookings(
-    getDemoBookings().map((booking) => booking.bookingId === updated.bookingId ? updated : booking),
+    getAllDemoBookings().map((booking) => booking.bookingId === updated.bookingId ? updated : booking),
   );
 }
 
 export function deleteDemoBooking(bookingId: number) {
-  saveDemoBookings(getDemoBookings().filter((booking) => booking.bookingId !== bookingId));
+  saveDemoBookings(getAllDemoBookings().filter((booking) => booking.bookingId !== bookingId));
+}
+
+export function getDemoBookings(): BookingDto[] {
+  return getAllDemoBookings().filter(booking => canAccessResource(currentScopeUser(), booking));
 }

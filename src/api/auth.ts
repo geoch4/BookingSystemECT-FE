@@ -1,6 +1,15 @@
 import client from './client';
 import type { LoginDto, CreateUserDto, OperationResult } from '../types';
 
+// Ends every existing session for this account, including copied tokens.
+export async function logout(): Promise<void> {
+  try {
+    await client.post('/auth/logout');
+  } catch (error) {
+    if ((error as { response?: { status?: number } }).response?.status !== 401) throw error;
+  }
+}
+
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 // This file contains API requests for logging in and registering.
 

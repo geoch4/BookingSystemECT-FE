@@ -16,6 +16,55 @@ import MetricCard from '../components/statistics/MetricCard';
 import ImprovementList from '../components/statistics/ImprovementList';
 import QualityRegistry from '../components/statistics/QualityRegistry';
 
+function DecisionGuide({ useLiveStatistics }: { useLiveStatistics: boolean }) {
+  return (
+    <section
+      aria-label="Så används statistiken"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 12,
+        marginBottom: 24,
+      }}
+    >
+      {[
+        ['Kapacitet', 'Finns tillräckligt med tider för ECT och rTMS?'],
+        ['Väntan', 'Var uppstår fördröjning från remiss till behandling?'],
+        ['Kvalitet', 'Vilka uppgifter saknas för register och uppföljning?'],
+      ].map(([title, text]) => (
+        <div
+          key={title}
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: 14,
+          }}
+        >
+          <div style={{ color: 'var(--text-main)', fontSize: 14, fontWeight: 850 }}>{title}</div>
+          <p style={{ ...styles.body, marginTop: 4 }}>{text}</p>
+        </div>
+      ))}
+      {!useLiveStatistics && (
+        <div
+          style={{
+            gridColumn: '1 / -1',
+            background: 'var(--warn-bg)',
+            border: '1px solid rgba(168, 100, 5, 0.28)',
+            borderRadius: 12,
+            padding: 14,
+            color: 'var(--text-main)',
+            fontSize: 14,
+            fontWeight: 750,
+          }}
+        >
+          Visar exempeldata. Använd siffrorna för att förstå layout och arbetsflöde, inte som verklig verksamhetsstatistik.
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function StatisticsPage() {
   // Filters all three sections (metrics, improvements, registry) by module: all/ECT/rTMS.
   const [filter, setFilter] = useState<ModuleFilter>('all');
@@ -81,6 +130,8 @@ export default function StatisticsPage() {
           />
         </div>
       )}
+
+      <DecisionGuide useLiveStatistics={useLiveStatistics} />
 
       {/* Callout for the single most urgent improvement item */}
       {priorityItem && (

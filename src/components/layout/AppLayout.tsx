@@ -4,8 +4,9 @@ import { ArrowLeft, Bell, Home } from 'lucide-react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import Sidebar from './Sidebar';
-import { getAllowedPortalMode, getPortalHomePath, getPortalMode } from '../../config/portal';
+import { getAllowedPortalMode, getPortalHomePath } from '../../config/portal';
 import { getNotifications, markNotificationAsRead } from '../../api/notifications';
+import { roleDisplayName } from '../../utils/permissions';
 
 export default function AppLayout() {
   const { token, user } = useAuth();
@@ -28,8 +29,9 @@ export default function AppLayout() {
 
   if (!token || !user) return <Navigate to="/login" replace />;
 
-  const requestedPortal = getPortalMode();
   const allowedPortal = getAllowedPortalMode(user.role);
+  const portalParam = new URLSearchParams(location.search).get('portal');
+  const requestedPortal = portalParam === 'admin' || portalParam === 'department' ? portalParam : allowedPortal;
 
   if (requestedPortal !== allowedPortal) {
     return <Navigate to={getPortalHomePath(allowedPortal)} replace />;
@@ -38,6 +40,8 @@ export default function AppLayout() {
   const isHome = location.pathname === '/';
   const notifications = notificationsQuery.data ?? [];
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
+  const portalLabel = allowedPortal === 'department' ? 'Avdelningsportal' : 'Behandlingsportal';
+  const roleLabel = roleDisplayName(user.role);
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--page-bg)' }}>
@@ -69,6 +73,11 @@ export default function AppLayout() {
               </button>
             )}
           </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden rounded-xl border border-[#E3D8CB] bg-[#FFFCF7] px-3 py-2 text-right shadow-sm md:block">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{portalLabel}</div>
+              <div className="text-sm font-semibold text-[#29374F]">{roleLabel}</div>
+            </div>
           <div className="relative">
             <button
               type="button"
@@ -136,6 +145,7 @@ export default function AppLayout() {
                 )}
               </section>
             )}
+          </div>
           </div>
         </div>
         <Outlet />

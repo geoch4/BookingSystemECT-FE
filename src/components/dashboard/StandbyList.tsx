@@ -1,12 +1,6 @@
 import { useLanguage } from '../../context/LanguageContext';
 import type { BookingDto, PatientDto } from '../../types';
 
-const STANDBY_MOCK = [
-  { id: 1, name: 'Andersson, Britta', ward: 'Avd 361', urgency: 'hög' as const },
-  { id: 2, name: 'Lindqvist, Göran', ward: 'Avd 362', urgency: 'medel' as const },
-  { id: 3, name: 'Svensson, Klara', ward: 'Avd 360', urgency: 'medel' as const },
-];
-
 const URGENCY_STYLE: Record<string, string> = {
   hög: 'bg-[#FDEAEA] text-[#C42B2B]',
   medel: 'bg-[#FEF3DC] text-[#D4860A]',
@@ -38,8 +32,7 @@ export default function StandbyList({ bookings = [], patientMap = {} }: StandbyL
         urgency: urgencyFromBooking(booking),
       };
     });
-  const items = liveItems.length > 0 ? liveItems : STANDBY_MOCK;
-  const usingLiveItems = liveItems.length > 0;
+  const items = liveItems;
 
   return (
     <div className="bg-white rounded-xl border border-[#DDE3EC]">
@@ -47,11 +40,14 @@ export default function StandbyList({ bookings = [], patientMap = {} }: StandbyL
         <h2 className="font-semibold text-[#1A2332]">{t('standbyList')}</h2>
         <p className="text-xs text-[#8494AA] mt-0.5">
           {items.length} {t('patientsWaiting')}
-          {!usingLiveItems && <span className="ml-1 text-[#185FA5]">(exempel)</span>}
         </p>
       </div>
       <div className="divide-y divide-[#DDE3EC]">
-        {items.map((p) => (
+        {items.length === 0 ? (
+          <div className="px-3 py-6 text-sm text-[#8494AA]">
+            Inga väntande patienter i vald vy.
+          </div>
+        ) : items.map((p) => (
           <div key={p.id} className="px-3 py-2.5 flex items-center justify-between hover:bg-[#F8FAFC]">
             <div>
               <div className="text-sm font-medium text-[#1A2332]">{p.name}</div>

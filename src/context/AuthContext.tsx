@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { jwtDecode } from 'jwt-decode';
 import { clearAuthToken, getAuthToken, setAuthToken } from '../utils/authToken';
 import { AuthContext, type AuthUser } from './authContextValue';
+import { logout as logoutOnServer } from '../api/auth';
 import {
   getAppRole,
   hasAnyPermission as roleHasAnyPermission,
@@ -29,7 +31,7 @@ function parseToken(token: string): AuthUser | null {
   try {
     const payload = jwtDecode<JwtPayload>(token);
     const expiresAt = payload.exp * 1000;
-    if (expiresAt <= Date.now()) return null;
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now() || !payload.sub) return null;
 
     const email = payload.email ?? payload[EMAIL_CLAIM] ?? '';
     const name = payload.name ?? payload[NAME_CLAIM] ?? email;
@@ -62,9 +64,11 @@ function getStoredAuth() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [auth, setAuth] = useState(getStoredAuth);
 
   const login = useCallback((newToken: string) => {
+    queryClient.clear();
     const nextUser = parseToken(newToken);
 
     if (!nextUser) {
@@ -75,20 +79,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setAuthToken(newToken);
     setAuth({ token: newToken, user: nextUser });
-  }, []);
+  }, [queryClient]);
 
-  const logout = useCallback(() => {
+  const clearSession = useCallback(() => {
+    queryClient.clear();
     clearAuthToken();
     setAuth({ token: null, user: null });
-  }, []);
+  }, [queryClient]);
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutOnServer();
+      clearSession();
+    } catch {
+      window.alert('Utloggningen kunde inte bekräftas av servern. Försök igen.');
+    }
+  }, [clearSession]);
 
   useEffect(() => {
     if (!auth.user) return undefined;
 
     const millisecondsUntilExpiry = auth.user.expiresAt - Date.now();
-    const timeoutId = window.setTimeout(logout, Math.max(0, millisecondsUntilExpiry));
+    const timeoutId = window.setTimeout(clearSession, Math.max(0, millisecondsUntilExpiry));
     return () => window.clearTimeout(timeoutId);
-  }, [auth.user, logout]);
+  }, [auth.user, clearSession]);
 
   const appRole = auth.user ? getAppRole(auth.user.role) : null;
   const hasPermission = useCallback((permission: Permission) => {

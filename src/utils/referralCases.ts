@@ -9,7 +9,6 @@ import {
 import type { BookingReferralMeta } from './bookingMeta';
 import { getReferralMetaForBooking } from './bookingMeta';
 import { getReferralLogistics, type ReferralLogistics } from './careLogistics';
-import { getDepartmentPriorityForBooking } from './departmentPriority';
 import { getRtmsSessionPlan, type RtmsSessionPlan } from './rtmsTreatmentPlan';
 
 export type ReferralCaseStatus =
@@ -177,8 +176,8 @@ export function buildReferralCases(
     const caseStatus = statusForCase(booking, missingDocuments, riskFlags);
     const department = referralMeta?.department || 'Ej angiven';
     const logistics = getReferralLogistics(department, booking.treatmentTypeId);
-    const departmentPriority = getDepartmentPriorityForBooking(booking.bookingId);
-    const rtmsSessionPlan = getRtmsSessionPlan(booking) ?? undefined;
+    const departmentPriority = booking.departmentPriority;
+    const rtmsSessionPlan = referralMeta?.rtmsSessionPlan ?? getRtmsSessionPlan(booking) ?? undefined;
 
     return {
       id: `referral-${booking.bookingId}`,

@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, CalendarCheck, ClipboardCheck, MapPin, PauseCircle, ShieldAlert, XCircle } from 'lucide-react';
-import { getBookings, updateBooking } from '../api/bookings';
+import { getBookings, updateBooking, getTreatmentUnits, assignTreatmentUnit } from '../api/bookings';
 import { getPatients } from '../api/patients';
 import BackendErrorState from '../components/common/BackendErrorState';
 import Spinner from '../components/common/Spinner';
 import ReferralTimeline from '../components/referral/ReferralTimeline';
 import { DEMO_MODE } from '../config/demo';
-import { getPortalMode } from '../config/portal';
+import { getAllowedPortalMode } from '../config/portal';
+import { useAuth } from '../context/useAuth';
 import { getAllBookingReferralMeta } from '../utils/bookingMeta';
 import { getDemoBookings, updateDemoBooking } from '../utils/demoBookings';
 import { buildReferralCases, type ReferralCase } from '../utils/referralCases';
@@ -23,6 +24,7 @@ import {
   recordReferralCompletionResponse,
 } from '../repositories/referralActionRepository';
 import type { ReferralActionNote, ReferralActionType } from '../utils/referralActions';
+import { maskPersonnummer } from '../utils/personnummer';
 
 function formatDateTime(date: string) {
   return new Date(date).toLocaleString('sv-SE', {
@@ -69,9 +71,22 @@ export default function ReferralDetailPage() {
   const { referralId } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const portalMode = getPortalMode();
-  const [actionNotesByReferralId, setActionNotesByReferralId] = useState(getReferralActionSnapshot);
-  const [actionEventsByReferralId, setActionEventsByReferralId] = useState(getReferralActionEventSnapshot);
+  const { user, isAdmin, hasPermission, hasAnyPermission } = useAuth();
+  const [receivingUnit, setReceivingUnit] = useState('');
+  const treatmentUnits = useQuery({queryKey:['treatment-units'], queryFn:getTreatmentUnits, enabled:isAdmin});
+  const assignment = useMutation({mutationFn: ({id, unit}: {id:number; unit:string}) => assignTreatmentUnit(id,unit), onSuccess:()=>qc.invalidateQueries({queryKey:['bookings']})});
+  const portalMode = getAllowedPortalMode(user?.role);
+  const canRequestCompletion = hasPermission('requestCompletion');
+  const canPrioritize = hasAnyPermission(['prioritizeReferral', 'manageClinicalDecision']);
+  const canConfirmTime = hasPermission('confirmElvisBooking');
+  const canBookOrPrioritize = canPrioritize || canConfirmTime;
+  const canRecordPatientAction = hasPermission('recordPatientAction');
+  const [actionNotesByReferralId, setActionNotesByReferralId] = useState<ReturnType<typeof getReferralActionSnapshot>>(
+    () => DEMO_MODE ? getReferralActionSnapshot() : {},
+  );
+  const [actionEventsByReferralId, setActionEventsByReferralId] = useState<ReturnType<typeof getReferralActionEventSnapshot>>(
+    () => DEMO_MODE ? getReferralActionEventSnapshot() : {},
+  );
   const [demoBookings, setDemoBookings] = useState(getDemoBookings);
   const [activeAction, setActiveAction] = useState<DetailActionType | null>(null);
   const [comment, setComment] = useState('');
@@ -88,7 +103,7 @@ export default function ReferralDetailPage() {
     () => Object.fromEntries((patientsQuery.data ?? []).map((patient) => [patient.patientId, patient])),
     [patientsQuery.data],
   );
-  const referralMetaByBookingId = useMemo(() => getAllBookingReferralMeta(), []);
+  const referralMetaByBookingId = useMemo(() => getAllBookingReferralMeta(DEMO_MODE), []);
   const backendUnavailable = bookingsQuery.isError || patientsQuery.isError;
   const isLoading = bookingsQuery.isLoading || patientsQuery.isLoading;
   const updateBookingMutation = useMutation({
@@ -178,6 +193,9 @@ export default function ReferralDetailPage() {
 
   function submitAction() {
     if (!referral || !activeAction || !comment.trim()) return;
+    if (activeAction === 'completion' && !canRequestCompletion) return;
+    if (activeAction === 'prioritize' && !canBookOrPrioritize) return;
+    if (['completion-response', 'pause', 'cancel', 'end'].includes(activeAction) && !canRecordPatientAction) return;
 
     if (activeAction === 'completion-response') {
       void persistReferralCompletionResponse(referral.id, comment.trim())
@@ -192,8 +210,8 @@ export default function ReferralDetailPage() {
       return;
     }
 
-    if (activeAction === 'prioritize') updateReferralBooking(referral, 'Confirmed', comment.trim());
-    if (activeAction === 'cancel') updateReferralBooking(referral, 'Cancelled', comment.trim());
+    if (DEMO_MODE && activeAction === 'prioritize') updateReferralBooking(referral, 'Confirmed', comment.trim());
+    if (DEMO_MODE && activeAction === 'cancel') updateReferralBooking(referral, 'Cancelled', comment.trim());
 
     const note: ReferralActionNote = {
       type: activeAction,
@@ -205,7 +223,10 @@ export default function ReferralDetailPage() {
     };
 
     void persistReferralAction(referral.id, note)
-      .then(() => qc.invalidateQueries({ queryKey: ['referral-actions'] }))
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: ['referral-actions'] });
+        void qc.invalidateQueries({ queryKey: ['bookings'] });
+      })
       .catch(() => {
         if (DEMO_MODE) {
           setActionNotesByReferralId(recordReferralAction(referral.id, note));
@@ -268,7 +289,7 @@ export default function ReferralDetailPage() {
               <div>
                 <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Remissdetalj</div>
                 <h1 className="mt-1 text-2xl font-bold text-[#1A2332]">{referral.patient.fullName}</h1>
-                <div className="mt-1 font-mono text-sm text-[#64748B]">{referral.patient.socialSecurityNumber}</div>
+                <div className="mt-1 font-mono text-sm text-[#64748B]">{maskPersonnummer(referral.patient.socialSecurityNumber)}</div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className={`rounded-full border px-3 py-1 text-xs font-bold ${priorityClass(referral)}`}>
@@ -284,6 +305,16 @@ export default function ReferralDetailPage() {
               <InfoBlock label="Behandling" value={referral.treatmentLabel} />
               <InfoBlock label="Önskad start/tid" value={formatDateTime(referral.booking.date)} />
               <InfoBlock label="Avdelning" value={referral.department} />
+              <InfoBlock label="Tilldelad behandlingsenhet" value={referral.booking.treatmentUnitId ?? 'Ej tilldelad'} />
+              {isAdmin && <div>
+                <label htmlFor="assign-treatment-unit">Tilldela behandlingsenhet</label>
+                <select id="assign-treatment-unit" value={receivingUnit} onChange={e=>setReceivingUnit(e.target.value)} className="block w-full rounded border p-2">
+                  <option value="">Välj behandlingsenhet</option>
+                  {(treatmentUnits.data ?? []).map(id=><option key={id} value={id}>{id}</option>)}
+                </select>
+                <button disabled={!receivingUnit || assignment.isPending} onClick={()=>assignment.mutate({id:referral.booking.bookingId,unit:receivingUnit})}>Spara tilldelning</button>
+                {assignment.isError && <p role="alert">Tilldelningen kunde inte sparas.</p>}
+              </div>}
               <InfoBlock label="Kontakt" value={`${referral.contactName}${referral.contactPhone ? `, ${referral.contactPhone}` : ''}`} />
             </div>
 
@@ -301,22 +332,31 @@ export default function ReferralDetailPage() {
 
               {portalMode === 'admin' ? (
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openAction('completion', referral)}
-                    className="rounded-lg border border-[#C9D6E6] bg-white px-3 py-2 text-sm font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
-                  >
-                    Begär komplettering
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openAction('prioritize', referral)}
-                    className="rounded-lg bg-[#185FA5] px-3 py-2 text-sm font-bold text-white hover:bg-[#124F8A]"
-                  >
-                    Prioritera / bekräfta tid
-                  </button>
+                  {canRequestCompletion && (
+                    <button
+                      type="button"
+                      onClick={() => openAction('completion', referral)}
+                      className="rounded-lg border border-[#C9D6E6] bg-white px-3 py-2 text-sm font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
+                    >
+                      Begär komplettering
+                    </button>
+                  )}
+                  {canBookOrPrioritize && (
+                    <button
+                      type="button"
+                      onClick={() => openAction('prioritize', referral)}
+                      className="rounded-lg bg-[#185FA5] px-3 py-2 text-sm font-bold text-white hover:bg-[#124F8A]"
+                    >
+                      {canPrioritize ? 'Prioritera / bekräfta tid' : 'Bekräfta tid'}
+                    </button>
+                  )}
+                  {!canRequestCompletion && !canBookOrPrioritize && (
+                    <p className="text-sm font-semibold text-[#64748B]">
+                      Din roll kan läsa ärendet, men har inga beslutsåtgärder här.
+                    </p>
+                  )}
                 </div>
-              ) : (
+              ) : canRecordPatientAction ? (
                 <div className="flex flex-wrap gap-2">
                   {actionNote?.type === 'completion' && !actionNote.responseComment && (
                     <button
@@ -351,6 +391,10 @@ export default function ReferralDetailPage() {
                     Avsluta behandling
                   </button>
                 </div>
+              ) : (
+                <p className="text-sm font-semibold text-[#64748B]">
+                  Din roll kan läsa ärendet, men kan inte ändra patientens behandling.
+                </p>
               )}
             </div>
           </section>
@@ -460,7 +504,7 @@ export default function ReferralDetailPage() {
 
                 <div className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-4 text-sm">
                   <div className="font-bold text-[#1A2332]">{referral.patient.fullName}</div>
-                  <div className="font-mono text-xs text-[#64748B]">{referral.patient.socialSecurityNumber}</div>
+                  <div className="font-mono text-xs text-[#64748B]">{maskPersonnummer(referral.patient.socialSecurityNumber)}</div>
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <InfoBlock label="Behandling" value={referral.treatmentLabel} />
                     <InfoBlock label="Enhet" value={referral.logistics.recommendedUnit.name} />
@@ -476,6 +520,7 @@ export default function ReferralDetailPage() {
                           <button
                             key={priority}
                             type="button"
+                            disabled={!canPrioritize}
                             onClick={() => setSelectedPriority(priority)}
                             className={`rounded-lg border px-3 py-2 text-xs font-bold ${
                               selectedPriority === priority

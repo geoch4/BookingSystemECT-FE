@@ -48,6 +48,7 @@ function createDemoToken(user: { email: string; name: string; role: string }) {
     email: user.email,
     name: user.name,
     role: user.role,
+    care_unit: user.role === 'Avdelning' ? 'Avdelning 361' : 'ECT-enhet',
     exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12,
   }));
 
@@ -170,7 +171,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold text-[#1A2332]">
             {mode === 'login' ? t('signIn') : t('createAccount')}
           </h1>
-          <p className="text-sm text-[#8494AA] mt-1">{t('bookingSystem')}</p>
+          <p className="text-sm text-[#64748B] mt-1">{t('bookingSystem')}</p>
         </div>
 
         {/* Mode toggle */}
@@ -182,7 +183,7 @@ export default function LoginPage() {
               className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 mode === m
                   ? 'bg-white text-[#1A2332] shadow-sm'
-                  : 'text-[#8494AA] hover:text-[#4B5770]'
+                  : 'text-[#4B5770] hover:text-[#1A2332]'
               }`}
             >
               {m === 'login' ? t('signIn') : t('register')}
@@ -193,8 +194,9 @@ export default function LoginPage() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('email')}</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-[#4B5770] mb-1">{t('email')}</label>
               <input
+                id="login-email"
                 type="email"
                 required
                 value={email}
@@ -204,8 +206,9 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('password')}</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-[#4B5770] mb-1">{t('password')}</label>
               <input
+                id="login-password"
                 type="password"
                 required
                 value={password}
@@ -224,7 +227,7 @@ export default function LoginPage() {
             </button>
             {DEMO_MODE && (
               <div className="rounded-xl border border-[#DDE3EC] bg-[#F8FAFC] p-3">
-                <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Testkonton</div>
+                <div className="text-xs font-bold uppercase tracking-wide text-[#64748B]">Testkonton</div>
                 <div className="mt-2 grid grid-cols-1 gap-2">
                   {demoUsers.map((user) => (
                     <button
@@ -246,8 +249,9 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('fullName')}</label>
+              <label htmlFor="register-fullname" className="block text-sm font-medium text-[#4B5770] mb-1">{t('fullName')}</label>
               <input
+                id="register-fullname"
                 type="text"
                 required
                 value={regFullname}
@@ -257,8 +261,9 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('email')}</label>
+              <label htmlFor="register-email" className="block text-sm font-medium text-[#4B5770] mb-1">{t('email')}</label>
               <input
+                id="register-email"
                 type="email"
                 required
                 value={regEmail}
@@ -268,8 +273,9 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('password')}</label>
+              <label htmlFor="register-password" className="block text-sm font-medium text-[#4B5770] mb-1">{t('password')}</label>
               <input
+                id="register-password"
                 type="password"
                 required
                 minLength={6}
@@ -280,8 +286,9 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4B5770] mb-1">{t('role')}</label>
+              <label htmlFor="register-role" className="block text-sm font-medium text-[#4B5770] mb-1">{t('role')}</label>
               <select
+                id="register-role"
                 required
                 value={regRoleId || ''}
                 onChange={(e) => setRegRoleId(Number(e.target.value))}
@@ -301,7 +308,7 @@ export default function LoginPage() {
             >
               {loading ? t('creatingAccount') : t('createAccount')}
             </button>
-            <p className="text-xs text-center text-[#8494AA]">
+            <p className="text-xs text-center text-[#64748B]">
               Kräver admin-behörighet. Kontakta systemadmin om du inte kan registrera dig.
             </p>
           </form>
