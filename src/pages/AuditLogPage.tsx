@@ -56,7 +56,7 @@ export default function AuditLogPage() {
     }),
   });
 
-  const logs = query.data ?? [];
+  const logs = useMemo(() => query.data ?? [], [query.data]);
   const actionCounts = useMemo(() => {
     return logs.reduce<Record<string, number>>((acc, log) => {
       acc[log.action] = (acc[log.action] ?? 0) + 1;

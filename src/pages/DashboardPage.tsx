@@ -564,7 +564,12 @@ export function PatientActionPanel({
   onCancel: (booking: BookingDto) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [selectedAction, setSelectedAction] = useState<QuickActionType | null>(null);
+  const [selectedAction, setSelectedAction] = useState<QuickActionType | null>(presetAction ?? null);
+  const [previousPresetAction, setPreviousPresetAction] = useState(presetAction);
+  if (presetAction !== previousPresetAction) {
+    setPreviousPresetAction(presetAction);
+    if (presetAction) setSelectedAction(presetAction);
+  }
   const [comment, setComment] = useState('');
   const [sentMessage, setSentMessage] = useState<string | null>(null);
 
@@ -573,10 +578,6 @@ export function PatientActionPanel({
     const id = window.setTimeout(() => setQuery(presetSearch), 0);
     return () => window.clearTimeout(id);
   }, [presetSearch]);
-  useEffect(() => {
-    if (!presetAction) return;
-    setSelectedAction(presetAction);
-  }, [presetAction]);
   const activeBookings = bookings
     .filter((booking) => booking.status !== 'Cancelled')
     .sort((a, b) => a.date.localeCompare(b.date));
