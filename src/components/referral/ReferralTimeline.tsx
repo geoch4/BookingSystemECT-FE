@@ -70,18 +70,16 @@ export default function ReferralTimeline({
   booking,
   note,
   events: actionEvents,
+  embedded = false,
 }: {
   booking: BookingDto;
   note?: ReferralActionNote;
   events?: ReferralActionEvent[];
+  embedded?: boolean;
 }) {
   const events = buildTimelineEvents(booking, note, actionEvents);
 
-  return (
-    <details className="mt-4 rounded-xl border border-[#DDE3EC] bg-white px-4 py-3">
-      <summary className="cursor-pointer text-sm font-bold text-[#185FA5]">
-        Historik ({events.length})
-      </summary>
+  const content = (
       <div className="mt-3 space-y-3">
         {events.map((event, index) => (
           <div key={`${event.title}-${event.date}-${index}`} className="flex gap-3">
@@ -97,6 +95,10 @@ export default function ReferralTimeline({
           </div>
         ))}
       </div>
-    </details>
   );
+  if (embedded) return <div aria-label="Remissens händelser">{content}</div>;
+  return <details className="mt-4 rounded-xl border border-[#DDE3EC] bg-white px-4 py-3">
+    <summary className="cursor-pointer text-sm font-bold text-[#185FA5]">Historik ({events.length})</summary>
+    {content}
+  </details>;
 }

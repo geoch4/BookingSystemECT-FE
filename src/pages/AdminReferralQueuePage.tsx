@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { AlertTriangle, ChevronDown, ClipboardCheck, FileWarning, MapPin, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, FileWarning, ShieldAlert } from 'lucide-react';
 import { getBookings, updateBooking } from '../api/bookings';
 import { getPatients } from '../api/patients';
 import BackendErrorState from '../components/common/BackendErrorState';
 import Spinner from '../components/common/Spinner';
-import ReferralTimeline from '../components/referral/ReferralTimeline';
+import ReferralWorkspace from '../components/referral/ReferralWorkspace';
 import { DEMO_MODE } from '../config/demo';
 import { getAllBookingReferralMeta } from '../utils/bookingMeta';
 import { getDemoBookings, updateDemoBooking } from '../utils/demoBookings';
@@ -24,7 +23,6 @@ import {
 } from '../repositories/referralActionRepository';
 import { getReferralQueueSnapshot } from '../repositories/referralRepository';
 import { isEctType, type BookingPriority, type CreateBookingDto, type PatientDto } from '../types';
-import { rtmsSessionPlanLabel } from '../utils/rtmsTreatmentPlan';
 import { useAuth } from '../context/useAuth';
 import { maskPersonnummer } from '../utils/personnummer';
 
@@ -42,302 +40,12 @@ function priorityLabel(priority: BookingPriority) {
   return 'Elektiv';
 }
 
-function statusBadge(referral: ReferralCase) {
-  if (referral.anesthesiaAttention) return 'border-[#E5A3A6] bg-white text-[#9F1D1D]';
-  return 'border-[#E3D8CB] bg-white text-[#4B5770]';
-}
-
-function formatDateTime(date: string) {
-  return new Date(date).toLocaleString('sv-SE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function todayYmd() {
   return new Date().toISOString().slice(0, 10);
 }
 
 function defaultBookingTime(referral: ReferralCase) {
   return isEctType(referral.booking.treatmentTypeId) ? '09:00' : '13:00';
-}
-
-function QueueCard({
-  referral,
-  note,
-  events,
-  isOpen,
-  onToggle,
-  onRequestCompletion,
-  onPrioritize,
-  canRequestCompletion,
-  canBookOrPrioritize,
-  prioritizeLabel,
-}: {
-  referral: ReferralCase;
-  note?: ReferralActionNote;
-  events?: Parameters<typeof ReferralTimeline>[0]['events'];
-  isOpen: boolean;
-  onToggle: () => void;
-  onRequestCompletion: (referral: ReferralCase) => void;
-  onPrioritize: (referral: ReferralCase) => void;
-  canRequestCompletion: boolean;
-  canBookOrPrioritize: boolean;
-  prioritizeLabel: string;
-}) {
-  const missingCount = referral.missingDocuments.length;
-  const warningCount = referral.riskFlags.length;
-
-  return (
-    <article className={`group relative overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:border-[#B8C7DA] hover:shadow-md ${
-      isOpen ? 'border-[#1A4F8A] ring-2 ring-[#1A4F8A]/10' : 'border-[#DDE3EC]'
-    }`}>
-      <div
-        className={`absolute inset-y-0 left-0 w-1 transition-colors duration-200 ${
-          isOpen
-            ? 'bg-[#1A4F8A]'
-            : referral.priority === 'Red'
-              ? 'bg-[#C42B2B]'
-              : 'bg-transparent group-hover:bg-[#B8C7DA]'
-        }`}
-        aria-hidden="true"
-      />
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full flex-wrap items-center justify-between gap-4 p-4 pl-5 text-left transition-colors duration-200 group-hover:bg-[#F8FAFC]"
-        aria-expanded={isOpen}
-      >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to={`/referrals/${referral.id}`}
-              onClick={(event) => event.stopPropagation()}
-              className="text-lg font-bold text-[#1A2332] hover:text-[#1A4F8A] hover:underline"
-            >
-              {referral.patient.fullName}
-            </Link>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${priorityBadge(referral.priority)}`}>
-              {priorityLabel(referral.priority)}
-            </span>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${statusBadge(referral)}`}>
-              {referral.statusLabel}
-            </span>
-            {referral.departmentPriority && (
-              <span className="rounded-full border border-[#C4B5FD] bg-[#F7F4FF] px-2.5 py-1 text-xs font-bold text-[#4F46E5]">
-                Avd prio {referral.departmentPriority}
-              </span>
-            )}
-            {referral.rtmsSessionPlan && (
-              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${
-                referral.rtmsSessionPlan === 'double'
-                  ? 'border-[#C4B5FD] bg-[#F7F4FF] text-[#4F46E5]'
-                  : 'border-[#A7D8CE] bg-[#F2FAF8] text-[#0F766E]'
-              }`}>
-                rTMS {rtmsSessionPlanLabel(referral.rtmsSessionPlan)}
-              </span>
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#64748B]">
-            <span className="font-mono">{maskPersonnummer(referral.patient.socialSecurityNumber)}</span>
-            <span>{referral.treatmentLabel}</span>
-            {referral.rtmsSessionPlan && <span className="font-semibold text-[#0F766E]">{rtmsSessionPlanLabel(referral.rtmsSessionPlan)}</span>}
-            <span>{referral.department}</span>
-            {referral.departmentPriority && <span className="font-semibold text-[#4F46E5]">Avdelningens prio {referral.departmentPriority}</span>}
-            {referral.logistics.requiresTransport && <span className="font-semibold text-[#4B5770]">Transport</span>}
-            {missingCount > 0 && <span className="font-semibold text-[#4B5770]">{missingCount} saknas</span>}
-            {warningCount > 0 && <span className="font-bold text-[#9F1D1D]">{warningCount} varning</span>}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 text-right text-xs text-[#64748B]">
-          <div>
-            <div className="font-bold text-[#1A2332]">{referral.treatmentTrack}</div>
-            <div>Skickad {formatDateTime(referral.submittedAt)}</div>
-          </div>
-          <ChevronDown
-            size={20}
-            className={`text-[#8494AA] transition-all duration-200 group-hover:text-[#1A4F8A] ${isOpen ? 'rotate-180 text-[#1A4F8A]' : ''}`}
-            aria-hidden="true"
-          />
-        </div>
-      </button>
-
-      {isOpen && <div className="border-t border-[#E5EAF1] bg-[#F8FAFC] p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Behandling</div>
-            <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.treatmentLabel}</div>
-            {referral.rtmsSessionPlan && (
-              <div className="mt-1 text-xs font-bold text-[#0F766E]">
-                {rtmsSessionPlanLabel(referral.rtmsSessionPlan)}
-              </div>
-            )}
-          </div>
-          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Önskad start</div>
-            <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.requestedStartDate}</div>
-          </div>
-          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Avdelning</div>
-            <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.department}</div>
-          </div>
-          <div className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Kontakt</div>
-            <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.contactName}</div>
-            {referral.contactPhone && <div className="text-xs text-[#64748B]">{referral.contactPhone}</div>}
-          </div>
-        </div>
-
-        {referral.departmentPriority && (
-          <div className="mt-3 rounded-xl border border-[#DDE3EC] bg-white px-4 py-3">
-            <div className="text-xs font-bold uppercase tracking-wide text-[#1A4F8A]">Avdelningens interna rangordning</div>
-            <div className="mt-1 text-sm font-semibold text-[#1A2332]">
-              Prioritet {referral.departmentPriority} från {referral.department}. Använd som stöd när flera patienter från samma avdelning konkurrerar om tillgängliga ECT-platser.
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
-          <section className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#1A2332]">
-              <ClipboardCheck size={16} aria-hidden="true" />
-              Dokument
-            </div>
-            <div className="space-y-2">
-              {referral.documents.map((document) => (
-                <div key={document.label} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-[#4B5770]">{document.label}</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
-                    document.complete
-                      ? 'border-[#DDE3EC] bg-[#F8FAFC] text-[#4B5770]'
-                      : 'border-[#DDE3EC] bg-white text-[#1A2332]'
-                  }`}>
-                    {document.complete ? 'Klar' : 'Saknas'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#1A2332]">
-              <MapPin size={16} aria-hidden="true" />
-              Logistik
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <span className="text-[#64748B]">Enhet</span>
-                <span className="text-right font-semibold text-[#1A2332]">{referral.logistics.recommendedUnit.name}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-[#64748B]">Flöde</span>
-                <span className="font-semibold text-[#1A2332]">{referral.logistics.patientFlow}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-[#64748B]">Vårdplats</span>
-                <span className="font-semibold text-[#1A2332]">{referral.logistics.sourceSite}</span>
-              </div>
-            </div>
-            {referral.logistics.transportLabel && (
-              <div className="mt-3 rounded-lg border border-[#DDE3EC] bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#4B5770]">
-                Transport behöver planeras
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-xl border border-[#DDE3EC] bg-white p-3">
-            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#1A2332]">
-              <ShieldAlert size={16} aria-hidden="true" />
-              Risker
-            </div>
-            {referral.riskFlags.length === 0 ? (
-              <div className="rounded-lg border border-[#DDE3EC] bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#4B5770]">
-                Inga särskilda riskflaggor
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {referral.riskFlags.map((flag) => (
-                  <div key={flag.label} className="rounded-lg border border-[#F0B4B7] bg-white px-3 py-2 text-sm font-semibold text-[#9F1D1D]">
-                    {flag.target === 'anesthesia' ? 'Anestesi: ' : ''}
-                    {flag.label}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {(referral.logistics.transportLabel || referral.logistics.overflowOption) && (
-          <div className="mt-3 rounded-xl border border-[#DDE3EC] bg-white p-3 text-sm text-[#4B5770]">
-            {referral.logistics.transportLabel && (
-              <div><span className="font-bold text-[#1A2332]">Transport:</span> {referral.logistics.transportLabel}</div>
-            )}
-            {referral.logistics.overflowOption && (
-              <div className="mt-1">{referral.logistics.overflowOption}</div>
-            )}
-          </div>
-        )}
-
-      {note && (
-        <div className="mt-3 rounded-xl border border-[#DDE3EC] bg-white p-3">
-          <div className="text-sm font-bold text-[#1A2332]">{note.title}</div>
-          <div className="mt-1 text-sm text-[#1A2332]">{note.comment}</div>
-          <div className="mt-1 text-xs text-[#64748B]">
-            {formatDateTime(note.createdAt)}
-            {note.priority ? ` · Prioritet: ${priorityLabel(note.priority)}` : ''}
-          </div>
-          {note.responseComment && (
-            <div className="mt-3 rounded-lg border border-[#E3D8CB] bg-white px-3 py-2">
-              <div className="text-xs font-bold uppercase tracking-wide text-[#64748B]">Svar från avdelningen</div>
-              <div className="mt-1 text-sm text-[#1A2332]">{note.responseComment}</div>
-              {note.respondedAt && (
-                <div className="mt-1 text-xs text-[#64748B]">{formatDateTime(note.respondedAt)}</div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <ReferralTimeline booking={referral.booking} note={note} events={events} />
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DDE3EC] bg-white px-3 py-3">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Nästa steg</div>
-          <div className="mt-1 text-sm font-semibold text-[#1A2332]">{referral.nextStep}</div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canRequestCompletion && (
-            <button
-              type="button"
-              onClick={() => onRequestCompletion(referral)}
-              className="rounded-lg border border-[#C9D6E6] px-3 py-2 text-xs font-bold text-[#185FA5] hover:bg-[#EFF6FF]"
-            >
-              Begär komplettering
-            </button>
-          )}
-          {canBookOrPrioritize && (
-            <button
-              type="button"
-              onClick={() => onPrioritize(referral)}
-              className="rounded-lg bg-[#1A4F8A] px-3 py-2 text-xs font-bold text-white hover:bg-[#123E72]"
-            >
-              {prioritizeLabel}
-            </button>
-          )}
-          {!canRequestCompletion && !canBookOrPrioritize && (
-            <span className="text-xs font-semibold text-[#64748B]">
-              Din roll kan läsa ärendet men inte fatta beslut här.
-            </span>
-          )}
-        </div>
-      </div>
-      </div>}
-    </article>
-  );
 }
 
 export default function AdminReferralQueuePage() {
@@ -349,7 +57,6 @@ export default function AdminReferralQueuePage() {
   const canBookOrPrioritize = canPrioritize || canConfirmTime;
   const prioritizeLabel = canPrioritize ? 'Prioritera / boka' : 'Bekräfta tid';
   const [filter, setFilter] = useState<QueueFilter>('all');
-  const [openReferralId, setOpenReferralId] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<{ type: QueueActionType; referral: ReferralCase } | null>(null);
   const [comment, setComment] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<BookingPriority>('Green');
@@ -498,22 +205,11 @@ export default function AdminReferralQueuePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#1A2332]">Remisskö</h1>
         <p className="mt-1 text-sm text-[#8494AA]">
-          Gemensam kö för behandlingsenheten: prioritering, dokumentkrav och anestesivarningar visas på samma ärende.
+          Välj en patient i listan. Granska underlag, logistik och historik utan att lämna remisskön.
         </p>
       </div>
 
       <div className="mb-4 rounded-2xl border border-[#DDE3EC] bg-white p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-wide text-[#8494AA]">Arbetsvy</div>
-            <div className="mt-1 text-sm font-semibold text-[#1A2332]">
-              Välj en kategori. Öppna sedan ett patientkort i taget för detaljer och beslut.
-            </div>
-          </div>
-          <div className="text-xs font-semibold text-[#64748B]">
-            {filtered.length} visas · ett ärende öppnas åt gången
-          </div>
-        </div>
         <div className="flex flex-wrap gap-2">
         {[
           { key: 'all' as const, label: 'Alla', count: counts.all, icon: ClipboardCheck },
@@ -527,7 +223,6 @@ export default function AdminReferralQueuePage() {
             type="button"
             onClick={() => {
               setFilter(item.key);
-              setOpenReferralId(null);
             }}
             className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-bold transition-colors ${
               filter === item.key ? 'border-[#1A4F8A] bg-[#EFF6FF] text-[#185FA5]' : 'border-[#DDE3EC] bg-white text-[#4B5770] hover:bg-[#F8FAFC]'
@@ -559,29 +254,16 @@ export default function AdminReferralQueuePage() {
       )}
 
       {!backendUnavailable && !isLoading && (
-        <section className="space-y-4">
-          {filtered.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#C3CEDA] bg-white px-4 py-12 text-center text-sm text-[#8494AA]">
-              Inga remisser matchar filtret.
-            </div>
-          ) : (
-            filtered.map((referral) => (
-              <QueueCard
-                key={referral.id}
-                referral={referral}
-                note={actionNotes[referral.id]}
-                events={actionEvents[referral.id]}
-                isOpen={openReferralId === referral.id}
-                onToggle={() => setOpenReferralId((current) => current === referral.id ? null : referral.id)}
-                onRequestCompletion={(item) => openAction('completion', item)}
-                onPrioritize={(item) => openAction('prioritize', item)}
-                canRequestCompletion={canRequestCompletion}
-                canBookOrPrioritize={canBookOrPrioritize}
-                prioritizeLabel={prioritizeLabel}
-              />
-            ))
-          )}
-        </section>
+        <ReferralWorkspace
+          referrals={filtered}
+          notes={actionNotes}
+          events={actionEvents}
+          canRequestCompletion={canRequestCompletion}
+          canBookOrPrioritize={canBookOrPrioritize}
+          prioritizeLabel={prioritizeLabel}
+          onRequestCompletion={item => openAction('completion', item)}
+          onPrioritize={item => openAction('prioritize', item)}
+        />
       )}
 
       {activeAction && (

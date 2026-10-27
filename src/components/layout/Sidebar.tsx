@@ -60,7 +60,7 @@ function initials(name?: string) {
   return name.split(' ').filter(Boolean).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 }
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onNavigate }: { mobileOpen?: boolean; onNavigate?: () => void }) {
   const { user, logout, hasPermission, appRole } = useAuth();
   const { t } = useLanguage();
   const portalMode = getAllowedPortalMode(user?.role);
@@ -70,14 +70,15 @@ export default function Sidebar() {
   const roleLabel = roleDisplayName(user?.role);
 
   return (
-    <aside aria-label="Sidopanel" style={{
+    <aside id="app-sidebar" aria-label="Sidopanel" className={`${mobileOpen ? 'flex' : 'hidden'} flex-col md:flex`} style={{
       width: 220, flexShrink: 0,
       background: 'linear-gradient(180deg, #1F2937 0%, #111827 58%, #0F172A 100%)', color: '#fff',
-      display: 'flex', flexDirection: 'column',
+      flexDirection: 'column',
       position: 'fixed', top: 0, bottom: 0, left: 0,
       height: '100dvh', zIndex: 30,
       boxShadow: '8px 0 28px rgba(17, 24, 39, 0.16)',
     }}>
+      <button type="button" onClick={onNavigate} className="m-3 self-end rounded-lg border border-white/30 px-3 py-2 text-sm font-semibold text-white md:hidden">Stäng meny</button>
       <div style={{ padding: '20px 20px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8494AA' }}>
           {portal.eyebrow}
@@ -112,6 +113,7 @@ export default function Sidebar() {
       <nav aria-label="Huvudnavigation" style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 3, overflowY: 'auto' }}>
         {navItems.map((item) => (
           <NavLink
+            onClick={onNavigate}
             key={item.to}
             to={item.to}
             end={item.end}

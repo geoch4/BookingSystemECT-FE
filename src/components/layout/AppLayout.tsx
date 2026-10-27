@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bell, Home } from 'lucide-react';
+import { ArrowLeft, Bell, Home, Menu } from 'lucide-react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import Sidebar from './Sidebar';
@@ -14,6 +14,7 @@ export default function AppLayout() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
   const notificationsQuery = useQuery({
     queryKey: ['notifications'],
@@ -46,14 +47,16 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--page-bg)' }}>
       <a href="#main-content" className="skip-link">Hoppa till innehåll</a>
-      <Sidebar />
+      {mobileNavigationOpen && <button type="button" aria-label="Stäng navigation" onClick={() => setMobileNavigationOpen(false)} className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
+      <Sidebar mobileOpen={mobileNavigationOpen} onNavigate={() => setMobileNavigationOpen(false)} />
       <main
         id="main-content"
-        className="min-w-0 overflow-x-hidden"
-        style={{ marginLeft: 220, minHeight: '100dvh' }}
+        className="min-w-0 overflow-x-hidden md:ml-[220px]"
+        style={{ minHeight: '100dvh' }}
       >
         <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[#E3D8CB] bg-[#F4F0EA]/90 px-6 py-3 backdrop-blur">
           <div className="flex min-w-0 items-center gap-2">
+            <button type="button" aria-label="Öppna navigation" aria-expanded={mobileNavigationOpen} aria-controls="app-sidebar" onClick={() => setMobileNavigationOpen(true)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-[#C5D2DF] bg-white text-[#192E43] md:hidden"><Menu size={20} aria-hidden="true" /></button>
             <button
               type="button"
               onClick={() => navigate(-1)}
