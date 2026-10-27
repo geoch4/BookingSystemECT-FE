@@ -25,6 +25,11 @@ import {
 } from '../repositories/referralActionRepository';
 import type { ReferralActionNote, ReferralActionType } from '../utils/referralActions';
 import { maskPersonnummer } from '../utils/personnummer';
+import ReferralClinicalSection from '../components/referral/ReferralClinicalSection';
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
 
 function formatDateTime(date: string) {
   return new Date(date).toLocaleString('sv-SE', {
@@ -303,7 +308,9 @@ export default function ReferralDetailPage() {
 
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
               <InfoBlock label="Behandling" value={referral.treatmentLabel} />
-              <InfoBlock label="Önskad start/tid" value={formatDateTime(referral.booking.date)} />
+              {referral.booking.status === 'Confirmed'
+                ? <InfoBlock label="Bokad tid" value={formatDateTime(referral.booking.date)} />
+                : <InfoBlock label="Önskad start" value={formatDate(referral.booking.requestedStartDate ?? referral.booking.date)} />}
               <InfoBlock label="Avdelning" value={referral.department} />
               <InfoBlock label="Tilldelad behandlingsenhet" value={referral.booking.treatmentUnitId ?? 'Ej tilldelad'} />
               {isAdmin && <div>
@@ -317,6 +324,12 @@ export default function ReferralDetailPage() {
               </div>}
               <InfoBlock label="Kontakt" value={`${referral.contactName}${referral.contactPhone ? `, ${referral.contactPhone}` : ''}`} />
             </div>
+
+            <ReferralClinicalSection
+              bookingId={referral.booking.bookingId}
+              track={referral.treatmentTrack}
+              enabled={!DEMO_MODE && referral.booking.bookingId > 0}
+            />
 
             <div className="mt-5 rounded-2xl border border-[#DDE3EC] bg-[#F8FAFC] p-4">
               <div className="mb-3">

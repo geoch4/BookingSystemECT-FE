@@ -192,7 +192,7 @@ export function buildReferralCases(
       priority: booking.priority,
       departmentPriority,
       submittedAt: booking.createdAt,
-      requestedStartDate: booking.date.slice(0, 10),
+      requestedStartDate: (booking.requestedStartDate ?? booking.date).slice(0, 10),
       documents,
       riskFlags,
       missingDocuments,

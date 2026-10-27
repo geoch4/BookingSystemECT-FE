@@ -2,6 +2,7 @@ import client from './client';
 import type {
   CreateReferralActionDto,
   ReferralActionDto,
+  ReferralClinicalDetails,
   ReferralDto,
   ReferralTimelineEventDto,
 } from '../types';
@@ -25,6 +26,12 @@ export const getMyReferrals = () =>
 
 export const getReferralActions = (referralId: number | string) =>
   client.get<ReferralActionDto[]>(`/referrals/${referralId}/actions`).then((response) => response.data);
+
+// Health information: the backend checks access per referral and logs every read.
+// 204 means the referral was sent before the clinical basis was stored.
+export const getReferralClinicalDetails = (referralId: number | string) =>
+  client.get<ReferralClinicalDetails | ''>(`/referrals/${referralId}/clinical`)
+    .then((response) => (response.status === 204 || !response.data ? null : response.data));
 
 export const getReferralTimeline = (referralId: number | string) =>
   client.get<ReferralTimelineEventDto[]>(`/referrals/${referralId}/timeline`).then((response) => response.data);

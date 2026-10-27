@@ -34,6 +34,8 @@ export function isRtmsType(t: number): boolean { return t >= 5 && t <= 7; }
 export interface BookingDto {
   bookingId: number;
   date: string;
+  // The day the department asked for; date is the booked slot once the referral is confirmed.
+  requestedStartDate?: string;
   patientId: number;
   treatmentTypeId: TreatmentType;
   createdById: number;
@@ -58,6 +60,10 @@ export interface BookingDto {
 
 // CreateBookingDto is the data the frontend sends to the backend when a booking is created or updated.
 export interface CreateBookingDto {
+  // The day the department asks for, as YYYY-MM-DD. Does not reserve a treatment slot.
+  requestedStartDate?: string;
+  // Clinical basis for the referral. Stored once by the backend when the referral is created.
+  clinicalDetails?: ReferralClinicalDetails;
   date: string;
   patientId: number;
   treatmentTypeId: TreatmentType;
@@ -290,4 +296,24 @@ export interface OperationResult<T> {
   success: boolean;
   data?: T;
   errorMessage?: string;
+}
+
+// Clinical basis a department submits with a referral (GET /referrals/:id/clinical).
+export interface ReferralClinicalDetails {
+  indication?: string | null;
+  anesthesiaInfo?: string | null;
+  somaticRisk?: string | null;
+  fastingConfirmed?: boolean | null;
+  bloodPressure?: string | null;
+  weightKg?: string | null;
+  allergies?: string | null;
+  medications?: string | null;
+  additionalInfo?: string | null;
+  rtmsSessionPlan?: 'single' | 'double' | null;
+  previousTreatments?: string | null;
+  treatmentGoal?: string | null;
+  contraindicationChecklistComplete?: boolean | null;
+  metalImplantsOrDevices?: boolean | null;
+  seizureHistory?: boolean | null;
+  completedDocuments: string[];
 }
