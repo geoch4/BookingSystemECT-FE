@@ -1,0 +1,57 @@
+.referral-workspace { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); min-width: 0; background: #fff; border: 1px solid #dce5ed; border-radius: 14px; color: #192e43; overflow: clip; }
+.referral-workspace button, .referral-workspace input { font: inherit; }
+.referral-workspace button { cursor: pointer; }
+.referral-workspace button:focus-visible, .referral-workspace input:focus-visible, .referral-workspace a:focus-visible, .referral-workspace summary:focus-visible { outline: 3px solid #146c72; outline-offset: 3px; }
+.referral-workspace__list { min-width: 0; border-right: 1px solid #dce5ed; }
+.referral-workspace__list ul, .referral-workspace__warnings ul { list-style: none; padding: 0; margin: 0; }
+.referral-workspace__search { padding: 20px 18px 16px; }
+.referral-workspace__search label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.referral-workspace__search > div { display: flex; gap: 8px; align-items: center; border: 1px solid #c5d2df; border-radius: 8px; padding: 10px; }
+.referral-workspace__search svg { flex-shrink: 0; color: #596d80; }
+.referral-workspace__search input { width: 100%; min-width: 0; border: 0; font-size: 14px; background: #fff; }
+.referral-workspace__list-label { margin: 0; padding: 0 18px 12px; color: #596d80; font-size: 12px; }
+.referral-workspace__patient { width: 100%; text-align: left; border: 0; border-top: 1px solid #e5ebf0; border-left: 3px solid transparent; padding: 18px 16px; background: #fff; color: #192e43; display: grid; gap: 6px; min-height: 104px; }
+.referral-workspace__patient:hover { background: #f3f6f9; }
+.referral-workspace__patient[aria-pressed=true] { background: #eaf5f4; border-left-color: #146c72; }
+.referral-workspace__patient-name { font-weight: 650; font-size: 14px; overflow-wrap: anywhere; }
+.referral-workspace__muted { color: #596d80; font-size: 12px; line-height: 1.6; }
+.referral-workspace__patient-status { font-size: 12px; line-height: 1.5; }
+.referral-workspace__detail { min-width: 0; padding: 26px; }
+.referral-workspace__identity { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.referral-workspace__identity h2 { font-size: 22px; font-weight: 650; letter-spacing: -.4px; margin: 0; overflow-wrap: anywhere; }
+.referral-workspace__context { font-size: 14px; color: #596d80; margin: 10px 0 18px; }
+.referral-workspace__urgent { color: #a82d3a; font-weight: 650; font-size: 12px; }
+.referral-workspace__priority { color: #425970; font-size: 12px; }
+.referral-workspace__warnings { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; margin-bottom: 20px; border-radius: 8px; background: #fff1f2; color: #9f2532; font-size: 13px; line-height: 1.6; }
+.referral-workspace__warnings svg { flex-shrink: 0; margin-top: 2px; }
+.referral-workspace__warnings li + li { margin-top: 4px; }
+.referral-workspace__tabs { display: flex; gap: 22px; flex-wrap: wrap; border-bottom: 1px solid #dce5ed; }
+.referral-workspace__tabs button { padding: 10px 0 13px; border: 0; border-bottom: 2px solid transparent; background: transparent; font-size: 14px; color: #596d80; }
+.referral-workspace__tabs button[aria-selected=true] { color: #146c72; border-bottom-color: #146c72; font-weight: 650; }
+.referral-workspace__content { padding-top: 24px; min-height: 300px; }
+.referral-workspace__content h3, .referral-workspace__next h3 { font-size: 13px; font-weight: 650; margin: 0 0 8px; }
+.referral-workspace__content p { font-size: 14px; line-height: 1.65; margin: 8px 0 16px; }
+.referral-workspace__facts { margin: 0 0 20px; }
+.referral-workspace__facts > div { display: grid; grid-template-columns: minmax(130px, .9fr) minmax(0, 1.2fr); gap: 16px; border-bottom: 1px solid #e5ebf0; padding: 12px 0; font-size: 14px; line-height: 1.6; }
+.referral-workspace__facts dt { color: #596d80; }
+.referral-workspace__facts dd { margin: 0; overflow-wrap: anywhere; }
+.referral-workspace__subvalue { display: block; color: #596d80; font-size: 12px; }
+.referral-workspace__missing { color: #a82d3a; font-weight: 600; }
+.referral-workspace__content .referral-workspace__hint, .referral-workspace__hint { color: #596d80; font-size: 12px; line-height: 1.6; }
+.referral-workspace__detail-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #146c72; text-decoration: underline; }
+.referral-workspace__risk-list { font-size: 14px; line-height: 1.65; padding-left: 20px; }
+.referral-workspace__risk-list li + li { margin-top: 8px; }
+.referral-workspace__additional summary { color: #146c72; cursor: pointer; font-size: 13px; }
+.referral-workspace__latest { margin-top: 22px; }
+.referral-workspace__next { border-top: 1px solid #dce5ed; margin-top: 24px; padding-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.referral-workspace__next p { font-size: 14px; line-height: 1.6; margin: 0; max-width: 480px; }
+.referral-workspace__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.referral-workspace__actions button { border-radius: 8px; min-height: 44px; padding: 11px 15px; font-size: 13px; font-weight: 600; }
+.referral-workspace__primary { border: 1px solid #12616a; background: #12616a; color: #fff; }
+.referral-workspace__primary:hover { background: #0e4e55; }
+.referral-workspace__secondary { border: 1px solid #c5d2df; background: #fff; color: #192e43; }
+.referral-workspace__secondary:hover { background: #f3f6f9; }
+.referral-workspace__empty { padding: 28px 18px; color: #596d80; font-size: 14px; line-height: 1.6; }
+@media (max-width: 1050px) { .referral-workspace { grid-template-columns: 240px minmax(0, 1fr); } .referral-workspace__detail { padding: 20px; } .referral-workspace__facts > div { grid-template-columns: minmax(100px, .8fr) minmax(0, 1fr); } }
+@media (max-width: 760px) { .referral-workspace { grid-template-columns: minmax(0, 1fr); } .referral-workspace__list { border-right: 0; border-bottom: 1px solid #dce5ed; } .referral-workspace__list > ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); } .referral-workspace__tabs { gap: 18px; } .referral-workspace__content { min-height: 0; } }
+@media (max-width: 420px) { .referral-workspace__facts > div { grid-template-columns: 1fr; gap: 4px; } .referral-workspace__detail { padding: 16px; } .referral-workspace__tabs { gap: 14px; } .referral-workspace__tabs button { font-size: 13px; } .referral-workspace__actions { width: 100%; } .referral-workspace__actions button { flex: 1; } }

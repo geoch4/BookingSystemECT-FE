@@ -113,8 +113,11 @@ export default function LoginPage() {
         setError(result.errorMessage ?? 'Fel e-post eller lösenord.');
       }
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
       const errorMessage = (err as { response?: { data?: { errorMessage?: string } } })?.response?.data?.errorMessage;
-      setError(errorMessage ?? 'Kunde inte ansluta till servern.');
+      setError(status === 429
+        ? 'För många inloggningsförsök. Vänta en minut och försök igen.'
+        : errorMessage ?? 'Kunde inte ansluta till servern.');
     } finally {
       setLoading(false);
     }
