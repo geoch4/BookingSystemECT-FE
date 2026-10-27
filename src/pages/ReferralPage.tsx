@@ -9,6 +9,7 @@ import type { CreateBookingDto } from '../types';
 import { DEMO_MODE } from '../config/demo';
 import { PILOT_REGION_CODE, PILOT_SOURCE_SYSTEM } from '../config/pilot';
 import { saveBookingReferralMeta } from '../utils/bookingMeta';
+import { apiErrorMessage, buildClinicalDetails } from '../components/referral/referralPayload';
 import StepBar from '../components/referral/StepBar';
 import ReferralStep1 from '../components/referral/ReferralStep1';
 import ReferralStep2 from '../components/referral/ReferralStep2';
@@ -187,6 +188,10 @@ export default function ReferralPage() {
 
   const isLoading = createPatientMutation.isPending || createBookingMutation.isPending;
   const isError   = createPatientMutation.isError   || createBookingMutation.isError;
+  const errorMessage = apiErrorMessage(
+    createPatientMutation.error ?? createBookingMutation.error,
+    'Något gick fel. Kontrollera uppgifterna och försök igen.',
+  );
 
   // Creates the patient first if this is a new patient, then submits the booking.
   async function handleSubmit() {
@@ -217,6 +222,9 @@ export default function ReferralPage() {
       createdAt: new Date().toISOString(),
       priority: form.priority,
       status: 'Pending',
+      // The requested day is sent on its own; the backend never treats it as a booked slot.
+      requestedStartDate: form.preferredDate,
+      clinicalDetails: buildClinicalDetails(form),
       referralDepartment: careUnitId,
       referralContactName: form.contactName.trim(),
       referralContactPhone: form.contactPhone.trim(),
@@ -232,9 +240,8 @@ export default function ReferralPage() {
 
     const booking = await createBookingMutation.mutateAsync(payload);
 
-    const shouldSavePilotMeta =
-      DEMO_MODE
-      && (!booking.referralDepartment || (form.treatmentType !== null && isRtmsType(form.treatmentType)));
+    // Demo fallback only: the backend now stores department, contact and the rTMS plan itself.
+    const shouldSavePilotMeta = DEMO_MODE && !booking.referralDepartment;
 
     if (shouldSavePilotMeta) {
       saveBookingReferralMeta(booking.bookingId, {
@@ -311,10 +318,12 @@ export default function ReferralPage() {
           {step === 4 && (
             <ReferralReviewStep
               form={form}
-              onSubmit={handleSubmit}
+              // Errors are shown from the mutation state; catching here avoids an unhandled rejection.
+              onSubmit={() => { handleSubmit().catch(() => undefined); }}
               onBack={() => setStep(3)}
               isLoading={isLoading}
               error={isError}
+              errorMessage={errorMessage}
             />
           )}
         </div>

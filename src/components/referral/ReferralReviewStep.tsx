@@ -9,9 +9,10 @@ interface Props {
   onSubmit: () => void;
   isLoading: boolean;
   error: boolean;
+  errorMessage?: string;
 }
 
-export default function ReferralReviewStep({ form, onBack, onSubmit, isLoading, error }: Props) {
+export default function ReferralReviewStep({ form, onBack, onSubmit, isLoading, error, errorMessage }: Props) {
   const patientName = form.patient?.fullName || form.newPatientName;
   const patientPnr = form.patient?.socialSecurityNumber || form.newPatientPnr;
   const externalPatientId = form.externalPatientId || form.patient?.externalPatientId;
@@ -144,8 +145,8 @@ export default function ReferralReviewStep({ form, onBack, onSubmit, isLoading, 
       </div>
 
       {error && (
-        <div className="mt-4 text-sm text-[#C42B2B] bg-[#FDEAEA] px-3 py-2 rounded-lg">
-          Något gick fel. Kontrollera uppgifterna och försök igen.
+        <div role="alert" className="mt-4 text-sm text-[#C42B2B] bg-[#FDEAEA] px-3 py-2 rounded-lg">
+          {errorMessage ?? 'Något gick fel. Kontrollera uppgifterna och försök igen.'}
         </div>
       )}
 
